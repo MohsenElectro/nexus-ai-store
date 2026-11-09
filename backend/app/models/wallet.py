@@ -2,7 +2,7 @@ import enum
 from datetime import datetime, timezone
 from sqlalchemy import Column, Integer, BigInteger, Float, String, DateTime, Enum, ForeignKey
 from sqlalchemy.orm import relationship
-from app.core.database import Base
+from app.core.database import Base, utc_now
 
 class Currency(str, enum.Enum):
     TOMAN = "TOMAN"
@@ -28,7 +28,7 @@ class Wallet(Base):
     balance_toman = Column(BigInteger, default=0, nullable=False)
     balance_usdt = Column(Float, default=0.0, nullable=False)
     locked_toman = Column(BigInteger, default=0, nullable=False)
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
 
     # Relationships
     user = relationship("User", back_populates="wallet")
@@ -47,7 +47,7 @@ class Transaction(Base):
     idempotency_key = Column(String(100), unique=True, index=True, nullable=True)
     description = Column(String(255), nullable=True)
     reference_id = Column(String(100), nullable=True, index=True)  # Order ID or Authority
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
 
     # Relationships
     wallet = relationship("Wallet", back_populates="transactions")

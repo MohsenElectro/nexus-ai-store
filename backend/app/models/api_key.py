@@ -1,7 +1,6 @@
-from datetime import datetime, timezone
 from sqlalchemy import Column, Integer, BigInteger, String, Boolean, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
-from app.core.database import Base
+from app.core.database import Base, utc_now
 
 class ApiKey(Base):
     __tablename__ = "api_keys"
@@ -14,7 +13,7 @@ class ApiKey(Base):
     spend_limit_toman = Column(BigInteger, nullable=True)  # Optional budget cap
     total_spent_toman = Column(BigInteger, default=0, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False, index=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
     last_used_at = Column(DateTime, nullable=True)
 
     # Relationships
@@ -32,7 +31,7 @@ class TokenUsageLog(Base):
     completion_tokens = Column(Integer, default=0, nullable=False)
     total_tokens = Column(Integer, default=0, nullable=False)
     cost_toman = Column(BigInteger, default=0, nullable=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
+    created_at = Column(DateTime, default=utc_now, nullable=False, index=True)
 
     # Relationships
     api_key = relationship("ApiKey", back_populates="usage_logs")

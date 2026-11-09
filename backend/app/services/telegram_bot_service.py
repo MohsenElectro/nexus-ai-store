@@ -567,11 +567,11 @@ class TelegramBotService:
 
         if verification.get("success"):
             ref_id = verification["ref_id"]
-            from datetime import datetime, timezone
+            from app.core.database import utc_now
 
             payment_record.status = PaymentStatus.SUCCESSFUL
             payment_record.tracking_code = ref_id
-            payment_record.verified_at = datetime.now(timezone.utc)
+            payment_record.verified_at = utc_now()
             await db.commit()
 
             await wallet_service.credit_wallet(

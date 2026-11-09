@@ -1,8 +1,7 @@
 import enum
-from datetime import datetime, timezone
 from sqlalchemy import Column, Integer, BigInteger, Float, String, DateTime, Enum, ForeignKey
 from sqlalchemy.orm import relationship
-from app.core.database import Base
+from app.core.database import Base, utc_now
 
 class PaymentGateway(str, enum.Enum):
     ZARINPAL = "ZARINPAL"
@@ -33,7 +32,7 @@ class PaymentRequest(Base):
     # Reference or tracking code from bank/blockchain once verified
     tracking_code = Column(String(100), nullable=True)
     
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
     verified_at = Column(DateTime, nullable=True)
 
     # Relationships

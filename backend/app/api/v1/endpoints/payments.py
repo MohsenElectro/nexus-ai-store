@@ -1,9 +1,8 @@
-from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from app.core.database import get_db
+from app.core.database import get_db, utc_now
 from app.models.payment import PaymentRequest, PaymentStatus
 from app.models.wallet import TransactionType
 from app.services.payment_service import payment_service
@@ -56,7 +55,7 @@ async def verify_zarinpal_callback(
         ref_id = verification["ref_id"]
         payment_record.status = PaymentStatus.SUCCESSFUL
         payment_record.tracking_code = ref_id
-        payment_record.verified_at = datetime.now(timezone.utc)
+        payment_record.verified_at = utc_now()
         await db.commit()
 
         # Atomically credit user's wallet
@@ -107,7 +106,7 @@ async def mock_confirm_crypto_deposit(
     tx_hash = f"tx_tron_{order_id}_verified"
     payment_record.status = PaymentStatus.SUCCESSFUL
     payment_record.tracking_code = tx_hash
-    payment_record.verified_at = datetime.now(timezone.utc)
+    payment_record.verified_at = utc_now()
     await db.commit()
 
     # Credit wallet

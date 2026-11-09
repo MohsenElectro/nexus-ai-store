@@ -2,7 +2,7 @@ import enum
 from datetime import datetime, timezone
 from sqlalchemy import Column, Integer, BigInteger, Float, String, Text, Boolean, DateTime, Enum, ForeignKey
 from sqlalchemy.orm import relationship
-from app.core.database import Base
+from app.core.database import Base, utc_now
 
 class ProductCategory(str, enum.Enum):
     CHATGPT = "CHATGPT"
@@ -41,7 +41,7 @@ class Product(Base):
     fulfillment_type = Column(Enum(FulfillmentType), default=FulfillmentType.INSTANT_VAULT, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False, index=True)
     inventory_count = Column(Integer, default=0, nullable=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
 
     # Relationships
     vault_items = relationship("LicenseVaultItem", back_populates="product", cascade="all, delete-orphan")
@@ -56,7 +56,7 @@ class LicenseVaultItem(Base):
     encrypted_credentials = Column(Text, nullable=False)
     status = Column(String(20), default="AVAILABLE", nullable=False, index=True)  # AVAILABLE, RESERVED, DELIVERED
     order_id = Column(Integer, ForeignKey("orders.id", ondelete="SET NULL"), nullable=True, index=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
     delivered_at = Column(DateTime, nullable=True)
 
     # Relationships

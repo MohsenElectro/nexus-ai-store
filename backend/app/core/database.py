@@ -1,7 +1,12 @@
+from datetime import datetime, timezone
 from collections.abc import AsyncGenerator
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import DeclarativeBase
 from app.core.config import settings
+
+def utc_now() -> datetime:
+    """Returns naive UTC datetime for seamless cross-database compatibility (PostgreSQL & SQLite)."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 class Base(DeclarativeBase):
     pass

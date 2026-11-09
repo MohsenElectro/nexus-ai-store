@@ -1,4 +1,3 @@
-from datetime import datetime, timezone
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
@@ -8,6 +7,7 @@ from app.models.product import Product, FulfillmentType, LicenseVaultItem
 from app.models.order import Order, OrderItem, OrderStatus
 from app.models.wallet import TransactionType
 from app.core.security import decrypt_vault_payload
+from app.core.database import utc_now
 from app.services.wallet_service import wallet_service
 
 class OrderService:
@@ -69,7 +69,7 @@ class OrderService:
             # Assign and mark vault item
             available_item.status = "DELIVERED"
             available_item.order_id = order.id
-            available_item.delivered_at = datetime.now(timezone.utc)
+            available_item.delivered_at = utc_now()
             
             # Decrypt payload for display to buyer
             delivered_data = decrypt_vault_payload(available_item.encrypted_credentials)
@@ -110,7 +110,7 @@ class OrderService:
 
         order.status = OrderStatus.COMPLETED
         order.admin_notes = admin_notes or "فعال‌سازی دستی با موفقیت انجام شد."
-        order.updated_at = datetime.now(timezone.utc)
+        order.updated_at = utc_now()
         await db.commit()
         await db.refresh(order)
 
