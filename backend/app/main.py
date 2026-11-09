@@ -15,14 +15,17 @@ async def lifespan(app: FastAPI):
     # Initialize database tables on startup
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-        for col_sql in [
-            "ALTER TABLE users ADD COLUMN telegram_id VARCHAR(50)",
-            "ALTER TABLE users ADD COLUMN telegram_username VARCHAR(100)",
-        ]:
-            try:
+    # Lightweight migration for pre-existing databases (each in its own transaction,
+    # because a failed statement aborts the whole transaction on PostgreSQL)
+    for col_sql in [
+        "ALTER TABLE users ADD COLUMN telegram_id VARCHAR(50)",
+        "ALTER TABLE users ADD COLUMN telegram_username VARCHAR(100)",
+    ]:
+        try:
+            async with engine.begin() as conn:
                 await conn.execute(text(col_sql))
-            except Exception:
-                pass
+        except Exception:
+            pass
         
     # Seed initial showcase products if database is empty
     async with AsyncSessionLocal() as session:

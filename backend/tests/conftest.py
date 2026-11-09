@@ -6,12 +6,13 @@ from app.core.database import engine, Base
 async def setup_test_database():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-        for col_sql in [
-            "ALTER TABLE users ADD COLUMN telegram_id VARCHAR(50)",
-            "ALTER TABLE users ADD COLUMN telegram_username VARCHAR(100)",
-        ]:
-            try:
+    for col_sql in [
+        "ALTER TABLE users ADD COLUMN telegram_id VARCHAR(50)",
+        "ALTER TABLE users ADD COLUMN telegram_username VARCHAR(100)",
+    ]:
+        try:
+            async with engine.begin() as conn:
                 await conn.execute(text(col_sql))
-            except Exception:
-                pass
+        except Exception:
+            pass
     yield
