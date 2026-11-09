@@ -63,6 +63,7 @@ class TelegramBotService:
 
         res = await db.execute(select(User).where(User.telegram_id == tg_id))
         user = res.scalar_one_or_none()
+        is_admin_id = tg_id in getattr(settings, "ADMIN_TELEGRAM_IDS", [])
 
         if not user:
             user = User(
@@ -70,7 +71,7 @@ class TelegramBotService:
                 telegram_username=username,
                 full_name=full_name,
                 hashed_password=get_password_hash(secrets.token_urlsafe(16)),
-                role=UserRole.CUSTOMER,
+                role=UserRole.ADMIN if is_admin_id else UserRole.CUSTOMER,
                 is_active=True,
             )
             db.add(user)
@@ -78,6 +79,9 @@ class TelegramBotService:
             await db.refresh(user)
         else:
             updated = False
+            if is_admin_id and user.role != UserRole.ADMIN:
+                user.role = UserRole.ADMIN
+                updated = True
             if username and user.telegram_username != username:
                 user.telegram_username = username
                 updated = True
@@ -92,7 +96,7 @@ class TelegramBotService:
         return user
 
     @staticmethod
-    def _main_menu_keyboard() -> Dict[str, Any]:
+    def _main_menu_keyboard(is_admin: bool = False) -> Dict[str, Any]:
         buttons = [
             [
                 {"text": "🔥 آفرهای ویژه هوش مصنوعی", "callback_data": "menu:offers"},
@@ -107,6 +111,12 @@ class TelegramBotService:
                 {"text": "💬 راهنما و پشتیبانی", "callback_data": "menu:support"},
             ],
         ]
+        if is_admin:
+            buttons.append(
+                [
+                    {"text": "👑 پنل مدیریت ادمین", "callback_data": "menu:admin"},
+                ]
+            )
         if settings.FRONTEND_URL and settings.FRONTEND_URL.startswith("https://"):
             buttons.append(
                 [
@@ -124,8 +134,10 @@ class TelegramBotService:
     ) -> Dict[str, Any]:
         wallet = await wallet_service.get_or_create_wallet(db, user.id)
         safe_name = html.escape(user.full_name or "کاربر گرامی")
+        is_admin = user.role == UserRole.ADMIN or str(user.telegram_id) in getattr(settings, "ADMIN_TELEGRAM_IDS", [])
+        admin_badge = " [👑 مدیر سیستم]" if is_admin else ""
         text = (
-            f"👋 سلام <b>{safe_name}</b> عزیز، به فروشگاه <b>AI Nexus Store</b> خوش آمدید!\n\n"
+            f"👋 سلام <b>{safe_name}</b> عزیز{admin_badge}، به فروشگاه <b>AI Nexus Store</b> خوش آمدید!\n\n"
             f"🚀 مرکز تخصصی عرضه <b>اکانت‌های پریمیوم و آفرهای ویژه هوش مصنوعی</b> با تحویل آنی از مخزن رمزنگاری‌شده.\n\n"
             f"💰 <b>موجودی کیف پول شما:</b> <code>{wallet.balance_toman:,}</code> تومان\n"
             f"📧 <b>ایمیل ثبت‌شده برای شارژ دستی:</b> <code>{html.escape(user.email or 'ثبت نشده')}</code>\n\n"
@@ -133,7 +145,7 @@ class TelegramBotService:
         )
         return {
             "text": text,
-            "reply_markup": cls._main_menu_keyboard(),
+            "reply_markup": cls._main_menu_keyboard(is_admin=is_admin),
         }
 
     @classmethod
@@ -725,6 +737,153 @@ class TelegramBotService:
         }
 
     @classmethod
+    async def build_admin_panel_view(cls, db: AsyncSession, user: User) -> Dict[str, Any]:
+        from sqlalchemy import func
+        from app.models.product import LicenseVaultItem
+
+        # Calculate revenue
+        rev_res = await db.execute(
+            select(func.sum(Order.total_toman)).where(Order.status == OrderStatus.COMPLETED)
+        )
+        total_revenue = rev_res.scalar() or 0
+
+        # Orders count
+        orders_res = await db.execute(select(func.count(Order.id)))
+        total_orders = orders_res.scalar() or 0
+
+        # Pending manual orders
+        pending_res = await db.execute(
+            select(func.count(Order.id)).where(Order.status == OrderStatus.AWAITING_MANUAL_FULFILLMENT)
+        )
+        pending_manual = pending_res.scalar() or 0
+
+        # Users count
+        users_res = await db.execute(select(func.count(User.id)))
+        total_users = users_res.scalar() or 0
+
+        # Available vault items
+        vault_res = await db.execute(
+            select(func.count(LicenseVaultItem.id)).where(LicenseVaultItem.status == "AVAILABLE")
+        )
+        available_vault = vault_res.scalar() or 0
+
+        text = (
+            "👑 <b>پنل مدیریت هوشمند نکسوس AI (Admin Panel)</b>\n\n"
+            f"💰 <b>کل درآمد فروشگاه:</b> <code>{int(total_revenue):,}</code> تومان\n"
+            f"🛍 <b>تعداد کل سفارش‌ها:</b> <code>{total_orders}</code> سفارش\n"
+            f"⏳ <b>سفارش‌های در انتظار اقدام دستی:</b> <code>{pending_manual}</code> مورد\n"
+            f"👥 <b>تعداد کل کاربران:</b> <code>{total_users}</code> کاربر\n"
+            f"📦 <b>موجودی آماده در انبار لایسنس (Vault):</b> <code>{available_vault}</code> عدد\n"
+            "─────────────────\n"
+            "👇 جهت مشاهده و تایید فوری سفارش‌های دستی انتخاب کنید:"
+        )
+
+        keyboard = [
+            [
+                {
+                    "text": f"📋 صف سفارش‌های دستی ({pending_manual})",
+                    "callback_data": "adm:orders",
+                }
+            ],
+            [
+                {"text": "🔄 بروزرسانی آمار", "callback_data": "menu:admin"},
+                {"text": "🏠 منوی اصلی فروشگاه", "callback_data": "menu:main"},
+            ],
+        ]
+        return {"text": text, "reply_markup": {"inline_keyboard": keyboard}}
+
+    @classmethod
+    async def build_admin_orders_view(cls, db: AsyncSession) -> Dict[str, Any]:
+        res = await db.execute(
+            select(Order)
+            .where(Order.status == OrderStatus.AWAITING_MANUAL_FULFILLMENT)
+            .options(selectinload(Order.items))
+            .order_by(Order.created_at.asc())
+            .limit(10)
+        )
+        pending_orders = res.scalars().all()
+        if not pending_orders:
+            return {
+                "text": "🎉 <b>صف سفارش‌های دستی خالی است!</b>\n\nتمامی سفارش‌ها انجام شده‌اند یا به صورت آنی از انبار تحویل داده شده‌اند.",
+                "reply_markup": {
+                    "inline_keyboard": [
+                        [{"text": "👑 پنل مدیریت", "callback_data": "menu:admin"}],
+                        [{"text": "🏠 منوی اصلی", "callback_data": "menu:main"}],
+                    ]
+                },
+            }
+
+        prod_res = await db.execute(select(Product))
+        prod_map = {p.id: p.title for p in prod_res.scalars().all()}
+
+        lines = ["📋 <b>سفارش‌های در انتظار فعال‌سازی کارت ارزی / فمیلی:</b>\n"]
+        keyboard = []
+        for ord_obj in pending_orders:
+            item = ord_obj.items[0] if ord_obj.items else None
+            title = prod_map.get(item.product_id, f"محصول #{item.product_id}") if item else "سفارش"
+            lines.append(
+                f"🧾 <b>سفارش #{ord_obj.id}</b>\n"
+                f"🛍 {html.escape(title)}\n"
+                f"📧 ایمیل مشتری: <code>{html.escape(ord_obj.target_email or 'ندارد')}</code>\n"
+                f"💵 مبلغ: <code>{ord_obj.total_toman:,}</code> تومان\n"
+                f"📝 یادداشت: {html.escape(ord_obj.customer_notes or 'بدون یادداشت')}\n"
+                "─────────────────"
+            )
+            keyboard.append(
+                [
+                    {
+                        "text": f"✅ تایید و تحویل سفارش #{ord_obj.id}",
+                        "callback_data": f"adm_ff:{ord_obj.id}",
+                    }
+                ]
+            )
+
+        keyboard.append([{"text": "👑 بازگشت به پنل ادمین", "callback_data": "menu:admin"}])
+        return {"text": "\n".join(lines), "reply_markup": {"inline_keyboard": keyboard}}
+
+    @classmethod
+    async def notify_admins_new_order(
+        cls, order: Order, product_title: str
+    ) -> None:
+        """
+        Sends real-time notification to all configured admins on Telegram
+        with an instant one-click fulfillment button.
+        """
+        if not settings.TELEGRAM_BOT_TOKEN or not getattr(settings, "ADMIN_TELEGRAM_IDS", []):
+            return
+
+        text = (
+            f"🔔 <b>سفارش جدید نیازمند اقدام دستی! (#{order.id})</b>\n\n"
+            f"🛍 <b>محصول:</b> {html.escape(product_title)}\n"
+            f"📧 <b>ایمیل مقصد مشتری:</b> <code>{html.escape(order.target_email or 'ثبت نشده')}</code>\n"
+            f"💵 <b>مبلغ پرداختی:</b> <code>{order.total_toman:,}</code> تومان\n"
+            f"📝 <b>توضیحات:</b> {html.escape(order.customer_notes or 'ندارد')}\n"
+            "─────────────────\n"
+            "👇 پس از شارژ با کارت یا ارسال دعوت‌نامه، دکمه زیر را لمس کنید:"
+        )
+        view = {
+            "text": text,
+            "reply_markup": {
+                "inline_keyboard": [
+                    [
+                        {
+                            "text": f"✅ تایید فعال‌سازی سفارش #{order.id}",
+                            "callback_data": f"adm_ff:{order.id}",
+                        }
+                    ],
+                    [
+                        {"text": "👑 ورود به پنل مدیریت", "callback_data": "menu:admin"}
+                    ],
+                ]
+            },
+        }
+        for admin_id in settings.ADMIN_TELEGRAM_IDS:
+            try:
+                await cls._send_telegram_response("sendMessage", admin_id, view)
+            except Exception:
+                pass
+
+    @classmethod
     async def handle_update(
         cls, db: AsyncSession, update: Dict[str, Any]
     ) -> Dict[str, Any]:
@@ -794,6 +953,21 @@ class TelegramBotService:
                 view = await cls.build_wallet_view(db, user)
             elif text in ("/orders", "📦 سفارش‌های من"):
                 view = await cls.build_orders_view(db, user)
+            elif text in ("/admin", "/panel", "👑 پنل مدیریت"):
+                is_admin = user.role == UserRole.ADMIN or tg_id in getattr(settings, "ADMIN_TELEGRAM_IDS", [])
+                if is_admin:
+                    view = await cls.build_admin_panel_view(db, user)
+                else:
+                    view = {
+                        "text": "⛔ <b>دسترسی غیرمجاز:</b>\nاین بخش فقط برای مدیران فروشگاه تعریف شده است.",
+                        "reply_markup": {"inline_keyboard": [[{"text": "🏠 منوی اصلی", "callback_data": "menu:main"}]]},
+                    }
+            elif text in ("/admin_orders", "صف سفارشات"):
+                is_admin = user.role == UserRole.ADMIN or tg_id in getattr(settings, "ADMIN_TELEGRAM_IDS", [])
+                if is_admin:
+                    view = await cls.build_admin_orders_view(db)
+                else:
+                    view = {"text": "⛔ دسترسی غیرمجاز."}
             else:
                 view = await cls.build_welcome_view(db, user)
 
@@ -857,6 +1031,51 @@ class TelegramBotService:
             elif data.startswith("usdt:"):
                 amount = int(data.split(":", 1)[1])
                 view = await cls.initiate_bot_usdt_topup(db, user, amount)
+            elif data == "menu:admin":
+                is_admin = user.role == UserRole.ADMIN or tg_id in getattr(settings, "ADMIN_TELEGRAM_IDS", [])
+                if is_admin:
+                    view = await cls.build_admin_panel_view(db, user)
+                else:
+                    view = {"text": "⛔ دسترسی غیرمجاز."}
+            elif data == "adm:orders":
+                is_admin = user.role == UserRole.ADMIN or tg_id in getattr(settings, "ADMIN_TELEGRAM_IDS", [])
+                if is_admin:
+                    view = await cls.build_admin_orders_view(db)
+                else:
+                    view = {"text": "⛔ دسترسی غیرمجاز."}
+            elif data.startswith("adm_ff:"):
+                is_admin = user.role == UserRole.ADMIN or tg_id in getattr(settings, "ADMIN_TELEGRAM_IDS", [])
+                if not is_admin:
+                    view = {"text": "⛔ دسترسی غیرمجاز."}
+                else:
+                    ord_id = int(data.split(":", 1)[1])
+                    try:
+                        await order_service.manual_fulfill(
+                            db=db,
+                            order_id=ord_id,
+                            admin_notes=f"فعال‌سازی توسط مدیر تلگرام (@{user.telegram_username or user.telegram_id}) با موفقیت تایید شد.",
+                        )
+                        view = {
+                            "text": (
+                                f"🎉 <b>سفارش #{ord_id} با موفقیت تایید و تکمیل شد!</b>\n\n"
+                                f"پیام تاییدیه و تحویل محصول بلافاصله به صورت خودکار برای خریدار ارسال گردید."
+                            ),
+                            "reply_markup": {
+                                "inline_keyboard": [
+                                    [{"text": "📋 بازگشت به صف سفارش‌ها", "callback_data": "adm:orders"}],
+                                    [{"text": "👑 پنل مدیریت", "callback_data": "menu:admin"}],
+                                ]
+                            },
+                        }
+                    except Exception as exc:
+                        view = {
+                            "text": f"❌ خطا در تایید سفارش #{ord_id}:\n{html.escape(str(exc))}",
+                            "reply_markup": {
+                                "inline_keyboard": [
+                                    [{"text": "👑 پنل مدیریت", "callback_data": "menu:admin"}]
+                                ]
+                            },
+                        }
             else:
                 view = await cls.build_welcome_view(db, user)
 

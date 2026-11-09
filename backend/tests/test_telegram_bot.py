@@ -207,3 +207,58 @@ async def test_telegram_bot_storefront_full_journey():
             assert orders_view_resp.status_code == 200
             assert "آخرین سفارش‌ها و لایسنس‌های شما" in orders_view_resp.json()["text"]
             assert "mohsen.ai.vip@gmail.com" in orders_view_resp.json()["text"]
+
+
+@pytest.mark.asyncio
+async def test_telegram_admin_features():
+    admin_id = 65807806
+
+    async with lifespan(app):
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            # 1. Admin sends /start -> should see admin badge
+            start_resp = await client.post(
+                "/api/v1/telegram/simulate",
+                json={
+                    "telegram_id": admin_id,
+                    "username": "MohsenElectro",
+                    "first_name": "محسن ادمین",
+                    "text": "/start",
+                },
+            )
+            assert start_resp.status_code == 200
+            assert "مدیر سیستم" in start_resp.json()["text"]
+
+            # 2. Admin opens /admin panel
+            admin_resp = await client.post(
+                "/api/v1/telegram/simulate",
+                json={
+                    "telegram_id": admin_id,
+                    "text": "/admin",
+                },
+            )
+            assert admin_resp.status_code == 200
+            assert "پنل مدیریت" in admin_resp.json()["text"]
+
+            # 3. Admin checks order queue /admin_orders
+            queue_resp = await client.post(
+                "/api/v1/telegram/simulate",
+                json={
+                    "telegram_id": admin_id,
+                    "text": "/admin_orders",
+                },
+            )
+            assert queue_resp.status_code == 200
+            assert "سفارش‌های در انتظار" in queue_resp.json()["text"]
+
+            # 4. Non-admin trying /admin -> gets rejected
+            forbidden_resp = await client.post(
+                "/api/v1/telegram/simulate",
+                json={
+                    "telegram_id": 99999999,
+                    "text": "/admin",
+                },
+            )
+            assert forbidden_resp.status_code == 200
+            assert "دسترسی غیرمجاز" in forbidden_resp.json()["text"]
+

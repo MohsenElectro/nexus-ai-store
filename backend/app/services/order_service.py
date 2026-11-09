@@ -93,6 +93,11 @@ class OrderService:
         if not is_instant:
             # Log cardholder notification dispatch
             print(f"[CARDHOLDER OPERATOR DISPATCH] New Order #{order.id} for {product.title}. Target Email: {target_email}. Amount: {product.price_toman:,} Toman. Ready for international card charge.")
+            try:
+                from app.services.telegram_bot_service import telegram_bot_service
+                await telegram_bot_service.notify_admins_new_order(order, product.title)
+            except Exception as exc:
+                print(f"[ADMIN NOTIFICATION ERROR] {exc}")
 
         return order
 
