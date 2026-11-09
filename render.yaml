@@ -1,0 +1,44 @@
+# Render Blueprint for AI Nexus Store (FastAPI Backend + Telegram Bot + Next.js Frontend + Postgres)
+databases:
+  - name: ai-nexus-db
+    databaseName: ai_nexus
+    user: ai_nexus_user
+    plan: free
+
+services:
+  # 1. FastAPI Backend + Integrated Telegram Bot Storefront
+  - type: web
+    name: ai-nexus-backend
+    runtime: python
+    rootDir: backend
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: TELEGRAM_WEBHOOK_SECRET
+        generateValue: true
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_BOT_USERNAME
+        value: "AINexusStoreBot"
+      - key: ZARINPAL_SANDBOX
+        value: "true"
+
+  # 2. Next.js 15 Storefront & Admin Dashboard
+  - type: web
+    name: ai-nexus-frontend
+    runtime: node
+    rootDir: frontend
+    plan: starter
+    buildCommand: npm install && npm run build
+    startCommand: npm run start -- -p $PORT
+    envVars:
+      - key: NODE_VERSION
+        value: "20.18.0"
+      - key: NEXT_PUBLIC_API_URL
+        sync: false

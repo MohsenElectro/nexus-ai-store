@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Nexus AI">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0c1017"/>
+      <stop offset="1" stop-color="#05070b"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#38bdf8"/>
+      <stop offset="1" stop-color="#818cf8"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <rect x="8" y="8" width="496" height="496" rx="104" fill="none" stroke="url(#glow)" stroke-opacity="0.35" stroke-width="4"/>
+  <!-- Stylized "N" built from a neural-node path -->
+  <path d="M144 372V140L368 372V140" fill="none" stroke="url(#glow)" stroke-width="44" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Nodes -->
+  <circle cx="144" cy="140" r="30" fill="#e0f2fe"/>
+  <circle cx="368" cy="372" r="30" fill="#e0f2fe"/>
+  <circle cx="368" cy="140" r="30" fill="#38bdf8"/>
+  <circle cx="144" cy="372" r="30" fill="#818cf8"/>
+  <!-- AI spark -->
+  <path d="M256 214l14 28 28 14-28 14-14 28-14-28-28-14 28-14z" fill="#ffffff"/>
+</svg>
