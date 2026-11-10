@@ -42,6 +42,7 @@ class Settings(BaseSettings):
     
     # Currency Rates
     TOMAN_PER_USDT: int = 70_000
+    PROFIT_MARGIN_PERCENT: float = 0.0
     CRYPTO_DEPOSIT_ADDRESS: str = "TQn9Y2khEsLJW1ChVWFMSMeSTow5KaxnSE"  # Tron TRC-20
 
     # Cardholder & Operator Dispatcher

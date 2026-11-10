@@ -771,6 +771,8 @@ class TelegramBotService:
             select(func.count(LicenseVaultItem.id)).where(LicenseVaultItem.status == "AVAILABLE")
         )
         available_vault = vault_res.scalar() or 0
+        current_rate = settings.TOMAN_PER_USDT
+        current_margin = getattr(settings, "PROFIT_MARGIN_PERCENT", 0.0)
 
         text = (
             "👑 <b>پنل مدیریت هوشمند نکسوس AI (Admin Panel)</b>\n\n"
@@ -779,8 +781,9 @@ class TelegramBotService:
             f"⏳ <b>سفارش‌های در انتظار اقدام دستی:</b> <code>{pending_manual}</code> مورد\n"
             f"👥 <b>تعداد کل کاربران:</b> <code>{total_users}</code> کاربر\n"
             f"📦 <b>موجودی آماده در انبار لایسنس (Vault):</b> <code>{available_vault}</code> عدد\n"
+            f"💵 <b>نرخ تتر:</b> <code>{current_rate:,}</code> تومان | <b>سود:</b> <code>%{current_margin:g}</code>\n"
             "─────────────────\n"
-            "👇 جهت مشاهده و تایید فوری سفارش‌های دستی انتخاب کنید:"
+            "👇 انتخاب کنید:"
         )
 
         keyboard = [
@@ -791,11 +794,112 @@ class TelegramBotService:
                 }
             ],
             [
+                {
+                    "text": "💵 تنظیم نرخ دلار و درصد سود (/rate)",
+                    "callback_data": "adm:rate",
+                }
+            ],
+            [
                 {"text": "🔄 بروزرسانی آمار", "callback_data": "menu:admin"},
                 {"text": "🏠 منوی اصلی فروشگاه", "callback_data": "menu:main"},
             ],
         ]
         return {"text": text, "reply_markup": {"inline_keyboard": keyboard}}
+
+    @classmethod
+    async def handle_admin_rate_command(
+        cls, db: AsyncSession, command_text: str
+    ) -> Dict[str, Any]:
+        parts = command_text.strip().split()
+        current_rate = settings.TOMAN_PER_USDT
+        current_margin = getattr(settings, "PROFIT_MARGIN_PERCENT", 0.0)
+
+        # Case 1: Just "/rate" with no arguments
+        if len(parts) == 1:
+            text = (
+                "💵 <b>تنظیم هوشمند نرخ دلار و حاشیه سود فروشگاه:</b>\n\n"
+                f"🔹 <b>نرخ فعلی تتر/دلار:</b> <code>{current_rate:,}</code> تومان\n"
+                f"🔹 <b>درصد سود فعلی:</b> <code>%{current_margin:g}</code>\n"
+                "─────────────────\n"
+                "📝 <b>نحوه استفاده از دستور:</b>\n"
+                "• فقط تغییر نرخ دلار:\n"
+                "  <code>/rate 73000</code>\n\n"
+                "• تغییر همزمان نرخ دلار و درصد سود:\n"
+                "  <code>/rate 73000 25</code>\n"
+                "<i>(مثال بالا نرخ را ۷۳,۰۰۰ تومان و سود را ۲۵٪ قرار می‌دهد و قیمت تمام محصولات بلافاصله در سایت و ربات آپدیت می‌شود)</i>"
+            )
+            return {
+                "text": text,
+                "reply_markup": {
+                    "inline_keyboard": [
+                        [{"text": "👑 بازگشت به پنل ادمین", "callback_data": "menu:admin"}],
+                        [{"text": "🏠 منوی اصلی", "callback_data": "menu:main"}],
+                    ]
+                },
+            }
+
+        # Case 2: User provides rate and optional margin
+        try:
+            raw_rate = parts[1].replace(",", "").replace("_", "")
+            new_rate = int(float(raw_rate))
+            if new_rate < 1000:
+                new_rate = new_rate * 1000
+        except ValueError:
+            return {"text": "❌ فرمت نرخ وارد شده نامعتبر است. مثال: <code>/rate 73000</code> یا <code>/rate 73000 25</code>"}
+
+        new_margin = current_margin
+        if len(parts) >= 3:
+            try:
+                raw_margin = parts[2].replace("%", "").replace(",", "")
+                new_margin = float(raw_margin)
+            except ValueError:
+                return {"text": "❌ درصد سود وارد شده نامعتبر است. مثال: <code>/rate 73000 25</code>"}
+
+        # Update in-memory settings
+        settings.TOMAN_PER_USDT = new_rate
+        settings.PROFIT_MARGIN_PERCENT = new_margin
+
+        # Recalculate prices for all active products
+        multiplier = 1.0 + (new_margin / 100.0)
+        res = await db.execute(select(Product))
+        products = res.scalars().all()
+        updated_lines = []
+
+        for p in products:
+            if p.price_usdt and p.price_usdt > 0:
+                raw_toman = p.price_usdt * new_rate * multiplier
+                if raw_toman >= 100_000:
+                    rounded_price = int(round(raw_toman / 10000.0) * 10000)
+                else:
+                    rounded_price = int(round(raw_toman / 5000.0) * 5000)
+                p.price_toman = rounded_price
+                if p.original_price_toman and p.original_price_toman > 0:
+                    p.original_price_toman = int(round((rounded_price * 1.25) / 10000.0) * 10000)
+                updated_lines.append(f"• <b>{html.escape(p.title)}:</b> <code>{rounded_price:,}</code> تومان (${p.price_usdt:g})")
+
+        await db.commit()
+
+        text = (
+            "🎉 <b>نرخ دلار و قیمت محصولات با موفقیت به‌روزرسانی شد!</b>\n\n"
+            f"💵 <b>نرخ جدید تتر:</b> <code>{new_rate:,}</code> تومان\n"
+            f"📈 <b>حاشیه سود:</b> <code>%{new_margin:g}</code>\n"
+            f"📦 <b>تعداد محصولات آپدیت‌شده:</b> <code>{len(updated_lines)}</code> محصول\n"
+            "─────────────────\n"
+            "📋 <b>لیست قیمت‌های جدید:</b>\n"
+            + "\n".join(updated_lines[:10]) +
+            ("\n..." if len(updated_lines) > 10 else "") +
+            "\n─────────────────\n"
+            "🌐 <i>تغییرات به صورت لحظه‌ای روی وب‌سایت، مینی‌اپ و ربات تلگرام اعمال شدند.</i>"
+        )
+        return {
+            "text": text,
+            "reply_markup": {
+                "inline_keyboard": [
+                    [{"text": "👑 پنل مدیریت", "callback_data": "menu:admin"}],
+                    [{"text": "🛍 مشاهده فروشگاه", "callback_data": "cat:ALL"}],
+                ]
+            },
+        }
 
     @classmethod
     async def build_admin_orders_view(cls, db: AsyncSession) -> Dict[str, Any]:
@@ -973,6 +1077,12 @@ class TelegramBotService:
                     view = await cls.build_admin_orders_view(db)
                 else:
                     view = {"text": "⛔ دسترسی غیرمجاز."}
+            elif text.startswith("/rate"):
+                is_admin = user.role == UserRole.ADMIN or tg_id in getattr(settings, "ADMIN_TELEGRAM_IDS", [])
+                if is_admin:
+                    view = await cls.handle_admin_rate_command(db, text)
+                else:
+                    view = {"text": "⛔ دسترسی غیرمجاز."}
             else:
                 view = await cls.build_welcome_view(db, user)
 
@@ -1046,6 +1156,12 @@ class TelegramBotService:
                 is_admin = user.role == UserRole.ADMIN or tg_id in getattr(settings, "ADMIN_TELEGRAM_IDS", [])
                 if is_admin:
                     view = await cls.build_admin_orders_view(db)
+                else:
+                    view = {"text": "⛔ دسترسی غیرمجاز."}
+            elif data == "adm:rate":
+                is_admin = user.role == UserRole.ADMIN or tg_id in getattr(settings, "ADMIN_TELEGRAM_IDS", [])
+                if is_admin:
+                    view = await cls.handle_admin_rate_command(db, "/rate")
                 else:
                     view = {"text": "⛔ دسترسی غیرمجاز."}
             elif data.startswith("adm_ff:"):

@@ -119,20 +119,20 @@ export default function ModernHero({
       </div>
 
       {/* Centerpiece Interactive Console */}
-      <div className="relative z-10 mx-auto mt-10 max-w-5xl rounded-2xl border border-white/[0.08] bg-[#0c1017]/90 p-3 shadow-2xl backdrop-blur-xl sm:p-5">
+      <div className="relative z-10 mx-auto mt-6 sm:mt-10 max-w-5xl rounded-2xl border border-white/[0.08] bg-[#0c1017]/90 p-2.5 sm:p-5 shadow-2xl backdrop-blur-xl">
         {/* Console Header Tabs */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.08] pb-3 px-2">
+        <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-white/[0.08] pb-3 px-1 sm:px-2">
           <div className="flex items-center gap-2">
-            <span className="h-3 w-3 rounded-full bg-rose-500/80" />
-            <span className="h-3 w-3 rounded-full bg-amber-500/80" />
-            <span className="h-3 w-3 rounded-full bg-emerald-500/80" />
-            <span className="mr-3 font-mono text-xs text-slate-500">nexus-hub ~ v2.4</span>
+            <span className="h-2.5 w-2.5 sm:h-3 sm:w-3 rounded-full bg-rose-500/80" />
+            <span className="h-2.5 w-2.5 sm:h-3 sm:w-3 rounded-full bg-amber-500/80" />
+            <span className="h-2.5 w-2.5 sm:h-3 sm:w-3 rounded-full bg-emerald-500/80" />
+            <span className="mr-2 font-mono text-[11px] sm:text-xs text-slate-500">nexus-hub ~ آنلاین</span>
           </div>
 
-          <div className="flex items-center gap-1.5 bg-slate-950/60 p-1 rounded-xl border border-white/5">
+          <div className="flex items-center gap-1 overflow-x-auto no-scrollbar max-w-full bg-slate-950/60 p-1 rounded-xl border border-white/5">
             <button
               onClick={() => setActiveHeroTab("DEALS")}
-              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all btn-press ${
+              className={`shrink-0 rounded-lg px-2.5 py-1 sm:px-3 sm:py-1.5 text-[11px] sm:text-xs font-semibold transition-all btn-press ${
                 activeHeroTab === "DEALS"
                   ? "bg-white text-slate-950 font-bold shadow-sm"
                   : "text-slate-400 hover:text-white"
@@ -142,7 +142,7 @@ export default function ModernHero({
             </button>
             <button
               onClick={() => setActiveHeroTab("API")}
-              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all btn-press ${
+              className={`shrink-0 rounded-lg px-2.5 py-1 sm:px-3 sm:py-1.5 text-[11px] sm:text-xs font-semibold transition-all btn-press ${
                 activeHeroTab === "API"
                   ? "bg-white text-slate-950 font-bold shadow-sm"
                   : "text-slate-400 hover:text-white"
@@ -152,7 +152,7 @@ export default function ModernHero({
             </button>
             <button
               onClick={() => setActiveHeroTab("SECURITY")}
-              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all btn-press ${
+              className={`shrink-0 rounded-lg px-2.5 py-1 sm:px-3 sm:py-1.5 text-[11px] sm:text-xs font-semibold transition-all btn-press ${
                 activeHeroTab === "SECURITY"
                   ? "bg-white text-slate-950 font-bold shadow-sm"
                   : "text-slate-400 hover:text-white"

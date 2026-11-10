@@ -152,23 +152,20 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-[#090a0f] text-slate-100 bg-subtle-grid pb-24 selection:bg-sky-500/30 selection:text-white">
-      {/* 1. Floating Top Navigation Bar */}
-      <header className="sticky top-4 z-40 mx-auto max-w-7xl px-4 sm:px-6">
+      {/* 1. Header Navigation Bar (Responsive & Mobile-Optimized) */}
+      <header className="sticky top-0 z-40 w-full border-b border-white/10 bg-[#0c1017]/95 backdrop-blur-xl sm:top-4 sm:mx-auto sm:max-w-7xl sm:rounded-2xl sm:border sm:px-6">
         <nav
           aria-label="منوی اصلی"
-          className="flex items-center justify-between rounded-2xl border border-white/10 bg-[#0c1017]/95 p-3 shadow-2xl backdrop-blur-xl"
+          className="flex items-center justify-between p-2.5 sm:p-3"
         >
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-slate-950 font-black shadow-md">
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-white text-slate-950 font-black shadow-md">
               AI
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-base font-extrabold tracking-tight text-white">
+                <span className="text-sm font-extrabold tracking-tight text-white sm:text-base">
                   AI Nexus Store
-                </span>
-                <span className="rounded-md bg-sky-500/10 px-2 py-0.5 text-[10px] font-bold text-sky-400 border border-sky-500/20">
-                  ۲.۴ رسمی
                 </span>
               </div>
               <span className="hidden text-[11px] text-slate-400 sm:inline">
@@ -177,7 +174,7 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Navigation Links */}
+          {/* Navigation Links for Desktop */}
           <div className="hidden items-center gap-1 sm:flex bg-[#06080d] p-1 rounded-xl border border-white/5">
             <button
               onClick={() => setActiveTab("STORE")}
@@ -225,18 +222,62 @@ export default function Home() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowWalletModal(true)}
-              className="btn-press flex items-center gap-2 rounded-xl border border-white/10 bg-slate-900/90 px-3.5 py-2 text-xs font-medium text-white hover:border-white/20 hover:bg-slate-800 shadow-sm transition-all"
+              className="btn-press flex items-center gap-1.5 rounded-xl border border-white/10 bg-slate-900/90 px-2.5 py-1.5 text-xs font-medium text-white hover:border-white/20 hover:bg-slate-800 shadow-sm transition-all sm:gap-2 sm:px-3.5 sm:py-2"
             >
-              <CreditCard className="h-4 w-4 text-sky-400" />
-              <span>
-                موجودی: {wallet ? wallet.balance_toman.toLocaleString("fa-IR") : "۰"} تومان
+              <CreditCard className="h-3.5 w-3.5 text-sky-400 sm:h-4 sm:w-4" />
+              <span className="text-[11px] sm:text-xs">
+                موجودی: {wallet ? wallet.balance_toman.toLocaleString("fa-IR") : "۰"} ت
               </span>
-              <span className="rounded-md bg-sky-500/20 px-2 py-0.5 text-[10px] font-bold text-sky-300 border border-sky-500/30">
+              <span className="rounded-md bg-sky-500/20 px-1.5 py-0.5 text-[9px] font-bold text-sky-300 border border-sky-500/30 sm:px-2 sm:text-[10px]">
                 + شارژ
               </span>
             </button>
           </div>
         </nav>
+
+        {/* Mobile Navigation Sub-Bar (Swipeable / Horizontal) */}
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar px-3 py-1.5 border-t border-white/5 bg-[#06080d]/90 sm:hidden">
+          <button
+            onClick={() => setActiveTab("STORE")}
+            className={`shrink-0 rounded-lg px-3 py-1 text-xs font-semibold transition-all ${
+              activeTab === "STORE"
+                ? "bg-white text-slate-950 font-bold shadow-sm"
+                : "text-slate-400"
+            }`}
+          >
+            🛍 فروشگاه و آفرها
+          </button>
+          <button
+            onClick={() => setActiveTab("ORDERS")}
+            className={`shrink-0 rounded-lg px-3 py-1 text-xs font-semibold transition-all ${
+              activeTab === "ORDERS"
+                ? "bg-white text-slate-950 font-bold shadow-sm"
+                : "text-slate-400"
+            }`}
+          >
+            📦 سفارش‌ها ({orders.length})
+          </button>
+          <button
+            onClick={() => setActiveTab("DEVELOPER")}
+            className={`shrink-0 rounded-lg px-3 py-1 text-xs font-semibold transition-all ${
+              activeTab === "DEVELOPER"
+                ? "bg-white text-slate-950 font-bold shadow-sm"
+                : "text-slate-400"
+            }`}
+          >
+            ⚡ هاب توکن
+          </button>
+          <button
+            onClick={() => setActiveTab("ADMIN")}
+            className={`shrink-0 rounded-lg px-3 py-1 text-xs font-semibold transition-all ${
+              activeTab === "ADMIN"
+                ? "border border-amber-500/40 bg-amber-500/20 text-amber-300 font-bold"
+                : "text-amber-400/80"
+            }`}
+          >
+            👑 انبار و ادمین
+          </button>
+        </div>
       </header>
 
       {/* Main Container */}

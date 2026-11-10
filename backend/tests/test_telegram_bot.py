@@ -251,7 +251,31 @@ async def test_telegram_admin_features():
             assert queue_resp.status_code == 200
             assert "سفارش‌های در انتظار" in queue_resp.json()["text"]
 
-            # 4. Non-admin trying /admin -> gets rejected
+            # 4. Admin checks /rate command
+            rate_info_resp = await client.post(
+                "/api/v1/telegram/simulate",
+                json={
+                    "telegram_id": admin_id,
+                    "text": "/rate",
+                },
+            )
+            assert rate_info_resp.status_code == 200
+            assert "تنظیم هوشمند نرخ دلار" in rate_info_resp.json()["text"]
+
+            # Admin updates rate and profit margin
+            rate_upd_resp = await client.post(
+                "/api/v1/telegram/simulate",
+                json={
+                    "telegram_id": admin_id,
+                    "text": "/rate 73000 25",
+                },
+            )
+            assert rate_upd_resp.status_code == 200
+            assert "با موفقیت به‌روزرسانی شد" in rate_upd_resp.json()["text"]
+            assert "73,000" in rate_upd_resp.json()["text"]
+            assert "%25" in rate_upd_resp.json()["text"]
+
+            # 5. Non-admin trying /admin -> gets rejected
             forbidden_resp = await client.post(
                 "/api/v1/telegram/simulate",
                 json={
