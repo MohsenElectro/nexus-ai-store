@@ -1,7 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.responses import HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
+from app.core.config import settings
 from app.core.database import get_db, utc_now
 from app.models.payment import PaymentRequest, PaymentStatus
 from app.models.wallet import TransactionType
@@ -10,26 +13,173 @@ from app.services.wallet_service import wallet_service
 
 router = APIRouter()
 
+def _render_receipt_html(
+    success: bool,
+    message: str,
+    amount_toman: int = 0,
+    ref_id: str = "",
+    authority: str = "",
+) -> HTMLResponse:
+    bot_url = f"https://t.me/{settings.TELEGRAM_BOT_USERNAME}" if settings.TELEGRAM_BOT_USERNAME else "https://t.me"
+    frontend_url = settings.FRONTEND_URL or "https://nexus-ai-frontend-rklq.onrender.com"
+    badge_bg = "#10b981" if success else "#ef4444"
+    badge_icon = "✓" if success else "✕"
+    title = "پرداخت با موفقیت انجام شد" if success else "پرداخت ناموفق یا لغو شده"
+    ref_row = f"<div class='row'><span class='label'>کد پیگیری بانکی:</span><span class='val'>{ref_id}</span></div>" if ref_id else ""
+
+    html = f"""<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{title} | AI Nexus Store</title>
+    <style>
+        body {{
+            background: #09090b;
+            color: #fafafa;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 16px;
+        }}
+        .card {{
+            background: #18181b;
+            border: 1px solid #27272a;
+            border-radius: 20px;
+            padding: 32px 24px;
+            max-width: 440px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+        }}
+        .icon-badge {{
+            width: 72px;
+            height: 72px;
+            background: {badge_bg};
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+            color: white;
+            margin: 0 auto 20px auto;
+        }}
+        h1 {{
+            font-size: 20px;
+            margin: 0 0 10px 0;
+            font-weight: 700;
+        }}
+        p.msg {{
+            color: #a1a1aa;
+            font-size: 14px;
+            line-height: 1.6;
+            margin: 0 0 24px 0;
+        }}
+        .table {{
+            background: #09090b;
+            border-radius: 12px;
+            padding: 14px;
+            margin-bottom: 24px;
+            text-align: right;
+            border: 1px solid #27272a;
+        }}
+        .row {{
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            font-size: 14px;
+            border-bottom: 1px solid #18181b;
+        }}
+        .row:last-child {{ border-bottom: none; }}
+        .label {{ color: #71717a; }}
+        .val {{ font-weight: 600; color: #f4f4f5; }}
+        .btn {{
+            display: block;
+            width: 100%;
+            padding: 13px;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 600;
+            text-decoration: none;
+            margin-bottom: 10px;
+            box-sizing: border-box;
+            transition: opacity 0.2s;
+        }}
+        .btn-primary {{
+            background: #2563eb;
+            color: white;
+        }}
+        .btn-secondary {{
+            background: #27272a;
+            color: #f4f4f5;
+        }}
+        .btn:hover {{ opacity: 0.9; }}
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="icon-badge">{badge_icon}</div>
+        <h1>{title}</h1>
+        <p class="msg">{message}</p>
+        <div class="table">
+            <div class="row">
+                <span class="label">مبلغ تراکنش:</span>
+                <span class="val">{amount_toman:,} تومان</span>
+            </div>
+            {ref_row}
+            <div class="row">
+                <span class="label">شناسه زرین‌پال:</span>
+                <span class="val" style="font-size: 12px;">{authority}</span>
+            </div>
+        </div>
+        <a href="{bot_url}" class="btn btn-primary">📱 بازگشت به ربات تلگرام</a>
+        <a href="{frontend_url}" class="btn btn-secondary">🛍 ورود به فروشگاه</a>
+    </div>
+</body>
+</html>"""
+    return HTMLResponse(content=html, status_code=200 if success else 400)
+
 @router.get("/verify/zarinpal")
 async def verify_zarinpal_callback(
+    request: Request,
     Authority: str = Query(...),
     Status: str = Query(...),
     db: AsyncSession = Depends(get_db),
 ):
     """
     Handles bank return callback after payment on ZarinPal.
+    Returns styled HTML for web browsers and JSON for API clients.
     """
+    wants_html = "text/html" in request.headers.get("accept", "")
+
     res = await db.execute(
         select(PaymentRequest).where(PaymentRequest.authority_or_order_id == Authority)
     )
     payment_record = res.scalar_one_or_none()
     if not payment_record:
+        if wants_html:
+            return _render_receipt_html(
+                success=False,
+                message="تراکنش مورد نظر در سیستم یافت نشد یا منقضی گردیده است.",
+                authority=Authority,
+            )
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="تراکنش مورد نظر در سیستم یافت نشد.",
         )
 
     if payment_record.status == PaymentStatus.SUCCESSFUL:
+        if wants_html:
+            return _render_receipt_html(
+                success=True,
+                message="این تراکنش قبلاً با موفقیت تایید و به کیف پول شما اضافه شده است.",
+                amount_toman=payment_record.amount_toman,
+                ref_id=payment_record.tracking_code or "",
+                authority=Authority,
+            )
         return {
             "success": True,
             "message": "این تراکنش قبلاً با موفقیت تایید و به کیف پول شما اضافه شده است.",
@@ -40,6 +190,13 @@ async def verify_zarinpal_callback(
     if Status != "OK":
         payment_record.status = PaymentStatus.FAILED
         await db.commit()
+        if wants_html:
+            return _render_receipt_html(
+                success=False,
+                message="پرداخت توسط شما لغو شد یا در درگاه بانکی با خطا مواجه گردید.",
+                amount_toman=payment_record.amount_toman,
+                authority=Authority,
+            )
         return {
             "success": False,
             "message": "پرداخت توسط کاربر لغو شد یا در درگاه بانکی با خطا مواجه گردید.",
@@ -70,6 +227,15 @@ async def verify_zarinpal_callback(
             idempotency_key=idempotency_key,
         )
 
+        if wants_html:
+            return _render_receipt_html(
+                success=True,
+                message="پرداخت شما با موفقیت تایید شد و کیف پول شما شارژ گردید.",
+                amount_toman=payment_record.amount_toman,
+                ref_id=ref_id,
+                authority=Authority,
+            )
+
         return {
             "success": True,
             "message": "پرداخت با موفقیت انجام شد و کیف پول شما شارژ گردید.",
@@ -79,6 +245,13 @@ async def verify_zarinpal_callback(
     else:
         payment_record.status = PaymentStatus.FAILED
         await db.commit()
+        if wants_html:
+            return _render_receipt_html(
+                success=False,
+                message="تایید تراکنش با درگاه بانکی ناموفق بود.",
+                amount_toman=payment_record.amount_toman,
+                authority=Authority,
+            )
         return {
             "success": False,
             "message": "تایید تراکنش با درگاه ناموفق بود.",
