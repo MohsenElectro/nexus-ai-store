@@ -51,6 +51,7 @@ class Settings(BaseSettings):
     # Telegram Bot Storefront Configuration
     TELEGRAM_BOT_TOKEN: Optional[str] = None
     TELEGRAM_BOT_USERNAME: str = "AINexusStoreBot"
+    SUPPORT_TELEGRAM_USERNAME: str = "I_am_grot"
     TELEGRAM_WEBHOOK_SECRET: str = "ai-nexus-tg-secret-token"
     FRONTEND_URL: str = "http://localhost:3000"
     ADMIN_TELEGRAM_IDS: List[str] = ["65807806"]
