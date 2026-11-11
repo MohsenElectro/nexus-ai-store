@@ -15,7 +15,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { toast } from "sonner";
-import { api, ApiKey } from "@/lib/api";
+import { api, ApiKey, getApiBase } from "@/lib/api";
 
 interface DeveloperStudioProps {
   apiKeys: ApiKey[];
@@ -36,8 +36,8 @@ export default function DeveloperStudio({
   const [generatedKey, setGeneratedKey] = useState("");
   const [copiedKey, setCopiedKey] = useState(false);
 
-  const currentHost = typeof window !== "undefined" ? window.location.hostname : "localhost";
-  const proxyBaseUrl = `http://${currentHost}:8000/v1`;
+  const apiBase = getApiBase();
+  const proxyBaseUrl = apiBase.replace(/\/api\/v1\/?$/, "/v1");
 
   const snippets = {
     python: `from openai import OpenAI
@@ -151,7 +151,7 @@ for await (const chunk of stream) {
   }
 
   return (
-    <div className="space-y-8 my-8">
+    <div className="space-y-6 sm:space-y-8 my-4 sm:my-8">
       {/* Top Banner */}
       <div className="relative overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0c1017] p-6 sm:p-8">
         <div className="flex flex-col justify-between gap-6 sm:flex-row sm:items-center">
@@ -248,21 +248,21 @@ for await (const chunk of stream) {
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Code Snippets Console */}
         <div className="rounded-2xl border border-white/[0.08] bg-[#0c1017] p-6 space-y-4">
-          <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/[0.06] pb-3">
             <div className="flex items-center gap-2">
-              <Code2 className="h-4 w-4 text-sky-400" />
+              <Code2 className="h-4 w-4 text-sky-400 shrink-0" />
               <h3 className="text-sm font-bold text-white">نمونه کد و راهنمای اتصال سریع</h3>
             </div>
 
             {/* Language Switcher Tabs */}
-            <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-lg border border-white/5">
+            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar bg-slate-900/90 p-1 rounded-xl border border-white/5 shrink-0 self-start sm:self-auto max-w-full">
               {(["python", "node", "curl", "cursor"] as const).map((lang) => (
                 <button
                   key={lang}
                   onClick={() => setSelectedLang(lang)}
-                  className={`rounded-md px-2.5 py-1 text-[11px] font-mono transition-all ${
+                  className={`rounded-lg px-2.5 py-1 text-[11px] font-mono transition-all btn-press shrink-0 ${
                     selectedLang === lang
-                      ? "bg-white text-slate-950 font-bold"
+                      ? "bg-white text-slate-950 font-bold shadow-sm"
                       : "text-slate-400 hover:text-white"
                   }`}
                 >

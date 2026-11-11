@@ -62,6 +62,13 @@ export default function Home() {
   // Active Tab
   const [activeTab, setActiveTab] = useState<"STORE" | "DEVELOPER" | "ORDERS" | "ADMIN">("STORE");
 
+  const handleTabChange = (tab: "STORE" | "DEVELOPER" | "ORDERS" | "ADMIN") => {
+    setActiveTab(tab);
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "instant" });
+    }
+  };
+
   useEffect(() => {
     initData();
   }, []);
@@ -152,131 +159,135 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-[#090a0f] text-slate-100 bg-subtle-grid pb-24 selection:bg-sky-500/30 selection:text-white">
-      {/* 1. Header Navigation Bar (Responsive & Mobile-Optimized) */}
-      <header className="sticky top-0 z-40 w-full border-b border-white/10 bg-[#0c1017]/95 backdrop-blur-xl sm:top-4 sm:mx-auto sm:max-w-7xl sm:rounded-2xl sm:border sm:px-6">
-        <nav
-          aria-label="منوی اصلی"
-          className="flex items-center justify-between p-2.5 sm:p-3"
-        >
-          <div className="flex items-center gap-2.5 sm:gap-3">
-            <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-white text-slate-950 font-black shadow-md">
-              AI
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-extrabold tracking-tight text-white sm:text-base">
-                  AI Nexus Store
+      {/* 1. Header Navigation Bar (Responsive & Mobile/Desktop Mini-App Optimized) */}
+      <header className="sticky top-0 z-40 w-full border-b border-white/10 bg-[#0c1017]/95 backdrop-blur-xl shadow-lg">
+        <div className="mx-auto max-w-7xl px-3 sm:px-6">
+          <nav
+            aria-label="منوی اصلی"
+            className="flex items-center justify-between py-2.5 sm:py-3"
+          >
+            <div className="flex items-center gap-2.5 sm:gap-3">
+              <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-white text-slate-950 font-black shadow-md">
+                AI
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-extrabold tracking-tight text-white sm:text-base">
+                    AI Nexus Store
+                  </span>
+                </div>
+                <span className="hidden text-[11px] text-slate-400 lg:inline">
+                  مرجع تخصصی اشتراک‌ها و هاب توکن هوش مصنوعی
                 </span>
               </div>
-              <span className="hidden text-[11px] text-slate-400 sm:inline">
-                مرجع تخصصی اشتراک‌ها و هاب توکن هوش مصنوعی
-              </span>
             </div>
-          </div>
 
-          {/* Navigation Links for Desktop */}
-          <div className="hidden items-center gap-1 sm:flex bg-[#06080d] p-1 rounded-xl border border-white/5">
+            {/* Navigation Links for Large Desktop (lg and up) */}
+            <div className="hidden items-center gap-1 lg:flex bg-[#06080d] p-1 rounded-xl border border-white/5">
+              <button
+                onClick={() => handleTabChange("STORE")}
+                className={`rounded-lg px-4 py-2 text-xs font-semibold transition-all btn-press ${
+                  activeTab === "STORE"
+                    ? "bg-white text-slate-950 font-bold shadow-sm"
+                    : "text-slate-400 hover:text-white hover:bg-slate-800/60"
+                }`}
+              >
+                فروشگاه و آفرها
+              </button>
+              <button
+                onClick={() => handleTabChange("DEVELOPER")}
+                className={`rounded-lg px-4 py-2 text-xs font-semibold transition-all btn-press ${
+                  activeTab === "DEVELOPER"
+                    ? "bg-white text-slate-950 font-bold shadow-sm"
+                    : "text-slate-400 hover:text-white hover:bg-slate-800/60"
+                }`}
+              >
+                هاب توکن و API
+              </button>
+              <button
+                onClick={() => handleTabChange("ORDERS")}
+                className={`rounded-lg px-4 py-2 text-xs font-semibold transition-all btn-press ${
+                  activeTab === "ORDERS"
+                    ? "bg-white text-slate-950 font-bold shadow-sm"
+                    : "text-slate-400 hover:text-white hover:bg-slate-800/60"
+                }`}
+              >
+                سفارش‌های من ({orders.length})
+              </button>
+              <button
+                onClick={() => handleTabChange("ADMIN")}
+                className={`rounded-lg px-4 py-2 text-xs font-semibold transition-all btn-press ${
+                  activeTab === "ADMIN"
+                    ? "border border-amber-500/30 bg-amber-500/10 text-amber-400 font-bold"
+                    : "text-amber-400/80 hover:bg-amber-500/10 hover:text-amber-300"
+                }`}
+              >
+                مدیریت و انبارداری
+              </button>
+            </div>
+
+            {/* Wallet Balance Pill */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowWalletModal(true)}
+                className="btn-press flex items-center gap-1.5 rounded-xl border border-white/10 bg-slate-900/90 px-2.5 py-1.5 text-xs font-medium text-white hover:border-white/20 hover:bg-slate-800 shadow-sm transition-all sm:gap-2 sm:px-3.5 sm:py-2"
+              >
+                <CreditCard className="h-3.5 w-3.5 text-sky-400 sm:h-4 sm:w-4 shrink-0" />
+                <span className="text-[11px] sm:text-xs whitespace-nowrap">
+                  موجودی: {wallet ? wallet.balance_toman.toLocaleString("fa-IR") : "۰"} ت
+                </span>
+                <span className="rounded-md bg-sky-500/20 px-1.5 py-0.5 text-[9px] font-bold text-sky-300 border border-sky-500/30 sm:px-2 sm:text-[10px] shrink-0">
+                  + شارژ
+                </span>
+              </button>
+            </div>
+          </nav>
+        </div>
+
+        {/* Navigation Sub-Bar (Mobile and Telegram Desktop < lg) */}
+        <div className="border-t border-white/5 bg-[#06080d]/95 backdrop-blur-md lg:hidden">
+          <div className="mx-auto flex max-w-7xl items-center justify-around sm:justify-center sm:gap-2 overflow-x-auto no-scrollbar px-2 py-1.5">
             <button
-              onClick={() => setActiveTab("STORE")}
-              className={`rounded-lg px-4 py-2 text-xs font-semibold transition-all btn-press ${
+              onClick={() => handleTabChange("STORE")}
+              className={`shrink-0 rounded-lg px-3 py-1 text-xs font-semibold transition-all btn-press ${
                 activeTab === "STORE"
                   ? "bg-white text-slate-950 font-bold shadow-sm"
-                  : "text-slate-400 hover:text-white hover:bg-slate-800/60"
+                  : "text-slate-400 hover:text-white"
               }`}
             >
-              فروشگاه و آفرها
+              🛍 فروشگاه و آفرها
             </button>
             <button
-              onClick={() => setActiveTab("DEVELOPER")}
-              className={`rounded-lg px-4 py-2 text-xs font-semibold transition-all btn-press ${
+              onClick={() => handleTabChange("DEVELOPER")}
+              className={`shrink-0 rounded-lg px-3 py-1 text-xs font-semibold transition-all btn-press ${
                 activeTab === "DEVELOPER"
                   ? "bg-white text-slate-950 font-bold shadow-sm"
-                  : "text-slate-400 hover:text-white hover:bg-slate-800/60"
+                  : "text-slate-400 hover:text-white"
               }`}
             >
-              هاب توکن و API
+              ⚡ هاب توکن
             </button>
             <button
-              onClick={() => setActiveTab("ORDERS")}
-              className={`rounded-lg px-4 py-2 text-xs font-semibold transition-all btn-press ${
+              onClick={() => handleTabChange("ORDERS")}
+              className={`shrink-0 rounded-lg px-3 py-1 text-xs font-semibold transition-all btn-press ${
                 activeTab === "ORDERS"
                   ? "bg-white text-slate-950 font-bold shadow-sm"
-                  : "text-slate-400 hover:text-white hover:bg-slate-800/60"
+                  : "text-slate-400 hover:text-white"
               }`}
             >
-              سفارش‌های من ({orders.length})
+              📦 سفارش‌ها ({orders.length})
             </button>
             <button
-              onClick={() => setActiveTab("ADMIN")}
-              className={`rounded-lg px-4 py-2 text-xs font-semibold transition-all btn-press ${
+              onClick={() => handleTabChange("ADMIN")}
+              className={`shrink-0 rounded-lg px-3 py-1 text-xs font-semibold transition-all btn-press ${
                 activeTab === "ADMIN"
-                  ? "border border-amber-500/30 bg-amber-500/10 text-amber-400 font-bold"
-                  : "text-amber-400/80 hover:bg-amber-500/10 hover:text-amber-300"
+                  ? "border border-amber-500/40 bg-amber-500/20 text-amber-300 font-bold"
+                  : "text-amber-400/80 hover:text-amber-300"
               }`}
             >
-              مدیریت و انبارداری
+              👑 انبار و ادمین
             </button>
           </div>
-
-          {/* Wallet Balance Pill */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowWalletModal(true)}
-              className="btn-press flex items-center gap-1.5 rounded-xl border border-white/10 bg-slate-900/90 px-2.5 py-1.5 text-xs font-medium text-white hover:border-white/20 hover:bg-slate-800 shadow-sm transition-all sm:gap-2 sm:px-3.5 sm:py-2"
-            >
-              <CreditCard className="h-3.5 w-3.5 text-sky-400 sm:h-4 sm:w-4" />
-              <span className="text-[11px] sm:text-xs">
-                موجودی: {wallet ? wallet.balance_toman.toLocaleString("fa-IR") : "۰"} ت
-              </span>
-              <span className="rounded-md bg-sky-500/20 px-1.5 py-0.5 text-[9px] font-bold text-sky-300 border border-sky-500/30 sm:px-2 sm:text-[10px]">
-                + شارژ
-              </span>
-            </button>
-          </div>
-        </nav>
-
-        {/* Mobile Navigation Sub-Bar (Swipeable / Horizontal) */}
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar px-3 py-1.5 border-t border-white/5 bg-[#06080d]/90 sm:hidden">
-          <button
-            onClick={() => setActiveTab("STORE")}
-            className={`shrink-0 rounded-lg px-3 py-1 text-xs font-semibold transition-all ${
-              activeTab === "STORE"
-                ? "bg-white text-slate-950 font-bold shadow-sm"
-                : "text-slate-400"
-            }`}
-          >
-            🛍 فروشگاه و آفرها
-          </button>
-          <button
-            onClick={() => setActiveTab("ORDERS")}
-            className={`shrink-0 rounded-lg px-3 py-1 text-xs font-semibold transition-all ${
-              activeTab === "ORDERS"
-                ? "bg-white text-slate-950 font-bold shadow-sm"
-                : "text-slate-400"
-            }`}
-          >
-            📦 سفارش‌ها ({orders.length})
-          </button>
-          <button
-            onClick={() => setActiveTab("DEVELOPER")}
-            className={`shrink-0 rounded-lg px-3 py-1 text-xs font-semibold transition-all ${
-              activeTab === "DEVELOPER"
-                ? "bg-white text-slate-950 font-bold shadow-sm"
-                : "text-slate-400"
-            }`}
-          >
-            ⚡ هاب توکن
-          </button>
-          <button
-            onClick={() => setActiveTab("ADMIN")}
-            className={`shrink-0 rounded-lg px-3 py-1 text-xs font-semibold transition-all ${
-              activeTab === "ADMIN"
-                ? "border border-amber-500/40 bg-amber-500/20 text-amber-300 font-bold"
-                : "text-amber-400/80"
-            }`}
-          >
-            👑 انبار و ادمین
-          </button>
         </div>
       </header>
 
@@ -295,7 +306,7 @@ export default function Home() {
                 setShowOrderModal(true);
                 setOrderResult(null);
               }}
-              onOpenDeveloperTab={() => setActiveTab("DEVELOPER")}
+              onOpenDeveloperTab={() => handleTabChange("DEVELOPER")}
               onOpenCalculator={() => {
                 const el = document.getElementById("token-calculator-section");
                 if (el) el.scrollIntoView({ behavior: "smooth" });

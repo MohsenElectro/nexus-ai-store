@@ -4,9 +4,12 @@ export function getApiBase(): string {
   }
   if (typeof window !== "undefined") {
     const hostname = window.location.hostname;
+    if (hostname.includes("onrender.com")) {
+      return "https://nexus-ai-backend-x13c.onrender.com/api/v1";
+    }
     return `http://${hostname}:8000/api/v1`;
   }
-  return "http://localhost:8000/api/v1";
+  return "https://nexus-ai-backend-x13c.onrender.com/api/v1";
 }
 
 export interface User {

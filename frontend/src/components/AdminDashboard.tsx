@@ -317,20 +317,20 @@ export default function AdminDashboard({ products, onRefreshProducts }: AdminDas
       </div>
 
       {/* Admin Subtabs Bar */}
-      <div className="flex flex-wrap gap-2 border-b border-white/[0.08] pb-4">
+      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-3 border-b border-white/[0.08] sm:flex-wrap">
         {[
-          { id: "ORDERS", label: `صف سفارش‌های دستی کارت ارزی (${pendingOrders.length})`, icon: Clock },
-          { id: "VAULT", label: "تزریق دسته‌ای اکانت به انبار (AES-256)", icon: Database },
-          { id: "PRICES", label: "مدیریت محصولات، قیمت‌ها و آفرها", icon: Package },
-          { id: "TELEGRAM", label: "🤖 ربات تلگرام فروشگاهی (پیش‌نمایش زنده)", icon: Send },
-          { id: "SETTINGS", label: "تنظیمات درگاه پرداخت و توکن ربات", icon: Settings },
+          { id: "ORDERS", label: `صف شارژ دستی (${pendingOrders.length})`, icon: Clock },
+          { id: "VAULT", label: "تزریق اکانت به انبار (AES-256)", icon: Database },
+          { id: "PRICES", label: "مدیریت محصولات و قیمت‌ها", icon: Package },
+          { id: "TELEGRAM", label: "پیش‌نمایش ربات تلگرام", icon: Send },
+          { id: "SETTINGS", label: "تنظیمات درگاه و تسویه", icon: Settings },
         ].map((tab) => {
           const Icon = tab.icon;
           return (
             <button
               key={tab.id}
               onClick={() => setActiveSubTab(tab.id as any)}
-              className={`btn-press flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-all ${
+              className={`btn-press shrink-0 flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all ${
                 activeSubTab === tab.id
                   ? "bg-white text-slate-950 font-bold shadow-sm"
                   : "border border-white/[0.08] bg-[#0c1017] text-slate-400 hover:border-white/20 hover:text-white"
