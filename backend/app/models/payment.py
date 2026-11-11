@@ -32,6 +32,10 @@ class PaymentRequest(Base):
     # Reference or tracking code from bank/blockchain once verified
     tracking_code = Column(String(100), nullable=True)
     
+    # Optional linked product purchase for direct deficit checkout
+    product_id = Column(Integer, nullable=True)
+    target_email = Column(String(255), nullable=True)
+    
     created_at = Column(DateTime, default=utc_now, nullable=False)
     verified_at = Column(DateTime, nullable=True)
 

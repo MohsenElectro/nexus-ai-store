@@ -194,18 +194,29 @@ export default function BentoProductGrid({ products, onSelectProduct }: BentoPro
                   </span>
                 </div>
 
-                <button
-                  onClick={() => onSelectProduct(p)}
-                  className="btn-press flex w-full items-center justify-center gap-2 rounded-xl bg-white py-2.5 text-xs font-bold text-slate-950 shadow hover:bg-slate-200 transition-all"
-                >
-                  <span>خرید و فعال‌سازی فوری</span>
-                  <ChevronLeft className="h-4 w-4" />
-                </button>
+                {p.fulfillment_type === "INSTANT_VAULT" && p.inventory_count <= 0 ? (
+                  <button
+                    disabled
+                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-slate-900/60 py-2.5 text-xs font-semibold text-slate-500 cursor-not-allowed"
+                  >
+                    <span>اتمام موجودی در انبار (شارژ به زودی)</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => onSelectProduct(p)}
+                    className="btn-press flex w-full items-center justify-center gap-2 rounded-xl bg-white py-2.5 text-xs font-bold text-slate-950 shadow hover:bg-slate-200 transition-all"
+                  >
+                    <span>خرید و تحویل فوری</span>
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                )}
 
                 <div className="mt-3 flex items-center justify-between text-[11px] text-slate-500">
                   <span className="flex items-center gap-1">
                     <Clock className="h-3 w-3 text-sky-400" />
-                    {p.fulfillment_type === "INSTANT_VAULT" ? "تحویل آنی از مخزن" : "شارژ مستقیم ایمیل"}
+                    {p.fulfillment_type === "INSTANT_VAULT"
+                      ? (p.inventory_count > 0 ? `موجودی: ${p.inventory_count.toLocaleString("fa-IR")} عدد آماده` : "موجودی: ۰")
+                      : "شارژ مستقیم ایمیل"}
                   </span>
                   <span className="text-emerald-400 font-medium">ضمانت ۳۰ روزه</span>
                 </div>

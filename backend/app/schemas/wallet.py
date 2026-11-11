@@ -27,6 +27,8 @@ class TransactionOut(BaseModel):
     created_at: datetime
 
 class WalletTopupRequest(BaseModel):
-    amount_toman: int = Field(..., gt=10000, json_schema_extra={"example": 100000}, description="حداقل مبلغ شارژ ۱۰,۰۰۰ تومان است")
+    amount_toman: int = Field(..., gt=0, json_schema_extra={"example": 100000}, description="مبلغ شارژ (تومان)")
     gateway: PaymentGateway = Field(default=PaymentGateway.ZARINPAL)
     callback_url: Optional[str] = None
+    product_id: Optional[int] = None
+    target_email: Optional[str] = None

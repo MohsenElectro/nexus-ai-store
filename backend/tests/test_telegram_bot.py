@@ -109,12 +109,12 @@ async def test_telegram_bot_storefront_full_journey():
             assert buy_zero_resp.status_code == 200
             assert "موجودی کیف پول شما برای خرید این محصول کافی نیست" in buy_zero_resp.json()["text"]
 
-            # 7. Top up wallet inside Telegram (3,000,000 Tomans)
+            # 7. Top up wallet inside Telegram (5,000,000 Tomans)
             topup_resp = await client.post(
                 "/api/v1/telegram/simulate",
                 json={
                     "telegram_id": tg_user_id,
-                    "callback_data": "top:3000000",
+                    "callback_data": "top:5000000",
                 },
             )
             assert topup_resp.status_code == 200
@@ -285,4 +285,76 @@ async def test_telegram_admin_features():
             )
             assert forbidden_resp.status_code == 200
             assert "دسترسی غیرمجاز" in forbidden_resp.json()["text"]
+
+@pytest.mark.asyncio
+async def test_telegram_webapp_auth_user_isolation():
+    """
+    Verifies that different Telegram accounts get completely isolated profiles and wallets,
+    preventing any balance leaking between accounts in the Mini App.
+    """
+    async with lifespan(app):
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            # 1. User A logs in from Telegram
+            user_a_tg = {"id": 111222333, "first_name": "کاربر اول", "username": "user_one"}
+            auth_a = await client.post(
+                "/api/v1/auth/telegram-webapp",
+                json={"init_data": "auth_date=1710000000&hash=mockhash", "user": user_a_tg},
+            )
+            assert auth_a.status_code == 200
+            token_a = auth_a.json()["access_token"]
+            assert auth_a.json()["user"]["telegram_id"] == "111222333"
+
+            # Check User A's initial wallet
+            wallet_a_resp = await client.get(
+                "/api/v1/wallet/",
+                headers={"Authorization": f"Bearer {token_a}"},
+            )
+            assert wallet_a_resp.status_code == 200
+            assert wallet_a_resp.json()["balance_toman"] == 0
+
+            # Top up User A's wallet by 250,000 Toman
+            topup_a = await client.post(
+                "/api/v1/wallet/topup",
+                headers={"Authorization": f"Bearer {token_a}"},
+                json={"amount_toman": 250000, "gateway": "ZARINPAL"},
+            )
+            assert topup_a.status_code == 200
+            auth_key_a = topup_a.json()["authority"]
+
+            # Simulate verification callback for User A
+            verify_a = await client.get(f"/api/v1/payments/verify/zarinpal?Authority={auth_key_a}&Status=OK")
+            assert verify_a.status_code == 200
+
+            # Check User A balance is now 250,000
+            wallet_a_updated = await client.get(
+                "/api/v1/wallet/",
+                headers={"Authorization": f"Bearer {token_a}"},
+            )
+            assert wallet_a_updated.json()["balance_toman"] == 250000
+
+            # 2. User B logs in from another Telegram account
+            user_b_tg = {"id": 999888777, "first_name": "کاربر دوم", "username": "user_two"}
+            auth_b = await client.post(
+                "/api/v1/auth/telegram-webapp",
+                json={"init_data": "auth_date=1710000000&hash=mockhash", "user": user_b_tg},
+            )
+            assert auth_b.status_code == 200
+            token_b = auth_b.json()["access_token"]
+            assert auth_b.json()["user"]["telegram_id"] == "999888777"
+
+            # Verify User B's wallet is 0 and NOT sharing User A's 250,000!
+            wallet_b_resp = await client.get(
+                "/api/v1/wallet/",
+                headers={"Authorization": f"Bearer {token_b}"},
+            )
+            assert wallet_b_resp.status_code == 200
+            assert wallet_b_resp.json()["balance_toman"] == 0
+
+            # Verify User A's balance is intact
+            wallet_a_check = await client.get(
+                "/api/v1/wallet/",
+                headers={"Authorization": f"Bearer {token_a}"},
+            )
+            assert wallet_a_check.json()["balance_toman"] == 250000
 

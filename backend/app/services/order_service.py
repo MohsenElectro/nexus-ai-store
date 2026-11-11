@@ -25,14 +25,25 @@ class OrderService:
         if not product or not product.is_active:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="محصول مورد نظر یافت نشد یا غیرفعال است.")
 
-        # Check inventory for instant delivery items
+        # Check inventory for instant delivery items with atomic row-locking
         if product.fulfillment_type == FulfillmentType.INSTANT_VAULT:
-            vault_res = await db.execute(
-                select(LicenseVaultItem)
-                .where(LicenseVaultItem.product_id == product.id, LicenseVaultItem.status == "AVAILABLE")
-                .limit(1)
-            )
-            available_item = vault_res.scalar_one_or_none()
+            try:
+                vault_res = await db.execute(
+                    select(LicenseVaultItem)
+                    .where(LicenseVaultItem.product_id == product.id, LicenseVaultItem.status == "AVAILABLE")
+                    .with_for_update(skip_locked=True)
+                    .limit(1)
+                )
+                available_item = vault_res.scalar_one_or_none()
+            except Exception:
+                # SQLite fallback
+                vault_res = await db.execute(
+                    select(LicenseVaultItem)
+                    .where(LicenseVaultItem.product_id == product.id, LicenseVaultItem.status == "AVAILABLE")
+                    .limit(1)
+                )
+                available_item = vault_res.scalar_one_or_none()
+
             if not available_item:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,

@@ -227,10 +227,35 @@ async def verify_zarinpal_callback(
             idempotency_key=idempotency_key,
         )
 
+        # Direct Deficit Checkout: If linked to a product purchase, execute atomic fulfillment!
+        order_fulfilled = False
+        delivered_info = None
+        if payment_record.product_id:
+            try:
+                from app.services.order_service import OrderService
+                order = await OrderService.create_order(
+                    db=db,
+                    user_id=payment_record.user_id,
+                    product_id=payment_record.product_id,
+                    target_email=payment_record.target_email,
+                    customer_notes=f"پرداخت کسری و تحویل مستقیم از درگاه (کد پیگیری: {ref_id})",
+                )
+                order_fulfilled = True
+                if order.items and order.items[0].delivered_data:
+                    delivered_info = order.items[0].delivered_data
+            except Exception as auto_ord_err:
+                print(f"[AUTO DIRECT ORDER ERROR] {auto_ord_err}")
+
+        success_msg = (
+            "پرداخت کسری با موفقیت تایید شد و اشتراک شما تحویل گردید!"
+            if order_fulfilled
+            else "پرداخت شما با موفقیت تایید شد و کیف پول شما شارژ گردید."
+        )
+
         if wants_html:
             return _render_receipt_html(
                 success=True,
-                message="پرداخت شما با موفقیت تایید شد و کیف پول شما شارژ گردید.",
+                message=success_msg,
                 amount_toman=payment_record.amount_toman,
                 ref_id=ref_id,
                 authority=Authority,
@@ -238,9 +263,11 @@ async def verify_zarinpal_callback(
 
         return {
             "success": True,
-            "message": "پرداخت با موفقیت انجام شد و کیف پول شما شارژ گردید.",
+            "message": success_msg,
             "ref_id": ref_id,
             "amount_toman": payment_record.amount_toman,
+            "order_fulfilled": order_fulfilled,
+            "delivered_data": delivered_info,
         }
     else:
         payment_record.status = PaymentStatus.FAILED

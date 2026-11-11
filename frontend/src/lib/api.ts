@@ -278,6 +278,24 @@ class ApiClient {
     return this.request<User>("/users/me");
   }
 
+  async authTelegramWebapp(initData: string, user?: any): Promise<{ access_token: string; token_type: string; user: User }> {
+    const apiBase = getApiBase();
+    const res = await fetch(`${apiBase}/auth/telegram-webapp`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ init_data: initData, user }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: "احراز هویت تلگرام ناموفق بود" }));
+      throw new Error(err.detail || "خطا در احراز هویت تلگرام");
+    }
+
+    const data = await res.json();
+    this.setToken(data.access_token);
+    return data;
+  }
+
   // Products with seamless fallback
   async getProducts(category?: string, specialOffersOnly = false): Promise<Product[]> {
     try {
@@ -304,10 +322,20 @@ class ApiClient {
     }
   }
 
-  async topupWallet(amountToman: number, gateway = "ZARINPAL"): Promise<{ payment_url?: string; authority?: string; [key: string]: any }> {
+  async topupWallet(
+    amountToman: number,
+    gateway = "ZARINPAL",
+    productId?: number,
+    targetEmail?: string
+  ): Promise<{ payment_url?: string; authority?: string; [key: string]: any }> {
     return this.request("/wallet/topup", {
       method: "POST",
-      body: JSON.stringify({ amount_toman: amountToman, gateway }),
+      body: JSON.stringify({
+        amount_toman: amountToman,
+        gateway,
+        product_id: productId,
+        target_email: targetEmail,
+      }),
     });
   }
 

@@ -30,3 +30,12 @@ class UserOut(BaseModel):
     role: UserRole
     is_active: bool
     created_at: datetime
+
+class TelegramAuthRequest(BaseModel):
+    init_data: str
+    user: Optional[dict] = None
+
+class TelegramAuthResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserOut

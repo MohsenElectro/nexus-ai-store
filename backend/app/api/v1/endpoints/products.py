@@ -1,10 +1,10 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 
 from app.core.database import get_db
-from app.models.product import Product, ProductCategory
+from app.models.product import Product, ProductCategory, FulfillmentType, LicenseVaultItem
 from app.schemas.product import ProductOut
 
 router = APIRouter()
@@ -23,7 +23,20 @@ async def list_products(
 
     query = query.order_by(Product.is_special_offer.desc(), Product.id.asc())
     result = await db.execute(query)
-    return result.scalars().all()
+    products = list(result.scalars().all())
+
+    # Dynamically verify available vault inventory for instant vault products
+    for p in products:
+        if p.fulfillment_type == FulfillmentType.INSTANT_VAULT:
+            vault_res = await db.execute(
+                select(func.count(LicenseVaultItem.id)).where(
+                    LicenseVaultItem.product_id == p.id,
+                    LicenseVaultItem.status == "AVAILABLE",
+                )
+            )
+            p.inventory_count = vault_res.scalar() or 0
+
+    return products
 
 @router.get("/{slug}", response_model=ProductOut)
 async def get_product_by_slug(

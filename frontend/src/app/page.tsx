@@ -76,16 +76,34 @@ export default function Home() {
   async function initData() {
     setLoading(true);
     try {
-      const token = localStorage.getItem("ai_nexus_token");
-      if (!token) {
+      const tg = typeof window !== "undefined" ? window.Telegram?.WebApp : null;
+      const tgUser = tg?.initDataUnsafe?.user;
+      const storedTgId = typeof window !== "undefined" ? localStorage.getItem("ai_nexus_tg_id") : null;
+      let currentToken = typeof window !== "undefined" ? localStorage.getItem("ai_nexus_token") : null;
+
+      // 1. Synchronized Telegram WebApp Authentication (Guarantees individual wallet per user)
+      if (tg && tg.initData && tgUser?.id) {
+        // If switched Telegram accounts or token missing
+        if (!currentToken || storedTgId !== String(tgUser.id)) {
+          try {
+            const authRes = await api.authTelegramWebapp(tg.initData, tgUser);
+            currentToken = authRes.access_token;
+            localStorage.setItem("ai_nexus_tg_id", String(tgUser.id));
+          } catch (e) {
+            console.error("Telegram WebApp auth error:", e);
+          }
+        }
+      } else if (!currentToken) {
+        // 2. Standalone browser fallback (Non-Telegram)
         try {
           const rand = Math.floor(1000 + Math.random() * 9000);
           await api.register({
             phone_number: `0912000${rand}`,
             password: "DemoPassword123!",
-            full_name: "کاربر آزمایشی",
+            full_name: "کاربر وب‌سایت",
           });
-          await api.login(`0912000${rand}`, "DemoPassword123!");
+          const loginRes = await api.login(`0912000${rand}`, "DemoPassword123!");
+          currentToken = loginRes.access_token;
         } catch {}
       }
 
@@ -106,6 +124,10 @@ export default function Home() {
   }
 
   async function handleTopup() {
+    if (topupAmount <= 0) {
+      toast.error("لطفاً یک مبلغ معتبر وارد نمایید.");
+      return;
+    }
     setTopupStatus("در حال اتصال به درگاه پرداخت...");
     try {
       const res = await api.topupWallet(topupAmount, selectedGateway);
@@ -154,6 +176,64 @@ export default function Home() {
       toast.error(err.message || "خطا در ثبت سفارش");
     } finally {
       setOrderProcessing(false);
+    }
+  }
+
+  async function handleDirectDeficitPay(deficitAmount: number) {
+    if (!selectedProduct) return;
+    setOrderProcessing(true);
+    setTopupStatus("در حال اتصال مستقیم به درگاه پرداخت شتاب برای تکمیل خرید...");
+    try {
+      const res = await api.topupWallet(
+        deficitAmount,
+        selectedGateway,
+        selectedProduct.id,
+        targetEmail
+      );
+      if (res.payment_url) {
+        setTopupStatus("در حال شبیه‌سازی تایید تراکنش بانکی و تحویل آنی لایسنس...");
+        if (res.authority) {
+          const apiBase = getApiBase();
+          const verifyRes = await fetch(
+            `${apiBase}/payments/verify/zarinpal?Authority=${res.authority}&Status=OK`
+          );
+          const vData = await verifyRes.json();
+          if (vData.success) {
+            toast.success("پرداخت کسری تایید شد و لایسنس شما به صورت آنی تحویل گردید!");
+            const [updatedWallet, updatedOrders] = await Promise.all([
+              api.getWallet(),
+              api.getMyOrders(),
+            ]);
+            setWallet(updatedWallet);
+            setOrders(updatedOrders);
+            if (vData.delivered_data) {
+              setOrderResult({
+                id: updatedOrders[0]?.id || Date.now(),
+                total_toman: selectedProduct.price_toman,
+                total_usdt: selectedProduct.price_usdt,
+                status: "COMPLETED",
+                items: [
+                  {
+                    id: 1,
+                    product_id: selectedProduct.id,
+                    quantity: 1,
+                    unit_price_toman: selectedProduct.price_toman,
+                    delivered_data: vData.delivered_data,
+                  },
+                ],
+                created_at: new Date().toISOString(),
+              });
+            } else if (updatedOrders.length > 0) {
+              setOrderResult(updatedOrders[0]);
+            }
+          }
+        }
+      }
+    } catch (err: any) {
+      toast.error(err.message || "خطا در پرداخت مستقیم کسری");
+    } finally {
+      setOrderProcessing(false);
+      setTopupStatus("");
     }
   }
 
@@ -465,9 +545,9 @@ export default function Home() {
 
             <div className="mt-5 space-y-4">
               <div>
-                <label className="text-xs text-slate-400">مبلغ شارژ (تومان):</label>
+                <label className="text-xs text-slate-400">انتخاب مبالغ پیشنهادی سریع:</label>
                 <div className="mt-1.5 grid grid-cols-3 gap-2">
-                  {[100000, 200000, 500000].map((amt) => (
+                  {[50000, 100000, 250000, 500000, 1000000, 2000000].map((amt) => (
                     <button
                       key={`topup-amt-${amt}`}
                       onClick={() => setTopupAmount(amt)}
@@ -481,6 +561,27 @@ export default function Home() {
                     </button>
                   ))}
                 </div>
+              </div>
+
+              <div>
+                <label className="text-xs text-slate-400">یا ورود مبلغ دلخواه (تومان):</label>
+                <div className="relative mt-1">
+                  <input
+                    type="number"
+                    min={1000}
+                    step={5000}
+                    placeholder="مبلغ دلخواه را وارد کنید..."
+                    value={topupAmount || ""}
+                    onChange={(e) => setTopupAmount(Math.max(0, parseInt(e.target.value) || 0))}
+                    className="w-full rounded-xl border border-white/10 bg-[#080b10] px-3.5 py-2.5 text-xs font-mono text-white placeholder-slate-500 focus:border-sky-500 focus:outline-none"
+                  />
+                  <span className="absolute left-3 top-2.5 text-xs text-slate-500">تومان</span>
+                </div>
+                {topupAmount > 0 && (
+                  <p className="mt-1 text-[11px] text-sky-400">
+                    مبلغ قابل پرداخت: {topupAmount.toLocaleString("fa-IR")} تومان
+                  </p>
+                )}
               </div>
 
               <div>
@@ -520,9 +621,10 @@ export default function Home() {
               <div className="mt-6 flex gap-3">
                 <button
                   onClick={handleTopup}
-                  className="btn-press flex-1 rounded-xl bg-white py-2.5 text-xs font-bold text-slate-950 hover:bg-slate-200 shadow transition-all"
+                  disabled={topupAmount <= 0}
+                  className="btn-press flex-1 rounded-xl bg-white py-2.5 text-xs font-bold text-slate-950 hover:bg-slate-200 disabled:opacity-50 shadow transition-all"
                 >
-                  تایید و پرداخت
+                  تایید و پرداخت {topupAmount > 0 ? `(${topupAmount.toLocaleString("fa-IR")} تومان)` : ""}
                 </button>
                 <button
                   onClick={() => setShowWalletModal(false)}
@@ -537,89 +639,162 @@ export default function Home() {
       )}
 
       {/* Order Purchase Modal */}
-      {showOrderModal && selectedProduct && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#0c1017] p-6 shadow-2xl">
-            <h3 className="text-base font-bold text-white">تایید خرید: {selectedProduct.title}</h3>
+      {showOrderModal && selectedProduct && (() => {
+        const currentBal = wallet?.balance_toman || 0;
+        const prodPrice = selectedProduct.price_toman;
+        const isInstant = selectedProduct.fulfillment_type === "INSTANT_VAULT";
+        const isOutOfStock = isInstant && (selectedProduct.inventory_count <= 0);
+        const hasEnoughBalance = currentBal >= prodPrice;
+        const deficit = Math.max(0, prodPrice - currentBal);
 
-            {!orderResult ? (
-              <div className="mt-4 space-y-4">
-                <div className="rounded-xl border border-white/[0.08] bg-[#080b10] p-3.5 text-xs space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">مبلغ سفارش:</span>
-                    <span className="font-bold text-white">
-                      {selectedProduct.price_toman.toLocaleString("fa-IR")} تومان
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">نوع تحویل:</span>
-                    <span className="font-semibold text-sky-400">
-                      {selectedProduct.fulfillment_type === "INSTANT_VAULT"
-                        ? "تحویل ۱۰۰٪ آنی از انبار"
-                        : "شارژ مستقیم با کارت ارزی"}
-                    </span>
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#0c1017] p-6 shadow-2xl">
+              <h3 className="text-base font-bold text-white">تایید خرید: {selectedProduct.title}</h3>
+
+              {!orderResult ? (
+                <div className="mt-4 space-y-4">
+                  {/* Stock Alert */}
+                  {isOutOfStock ? (
+                    <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3.5 text-xs text-rose-300 flex items-center gap-2">
+                      <AlertCircle className="h-4 w-4 shrink-0 text-rose-400" />
+                      <span>موجودی انبار این پکیج در حال حاضر به پایان رسیده است. به زودی توسط مدیریت شارژ خواهد شد.</span>
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-white/[0.08] bg-[#080b10] p-3.5 text-xs space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">مبلغ سفارش:</span>
+                        <span className="font-bold text-white">
+                          {prodPrice.toLocaleString("fa-IR")} تومان
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">موجودی کیف پول شما:</span>
+                        <span className={`font-semibold ${hasEnoughBalance ? "text-emerald-400" : "text-amber-400"}`}>
+                          {currentBal.toLocaleString("fa-IR")} تومان
+                        </span>
+                      </div>
+                      <div className="flex justify-between border-t border-white/5 pt-2">
+                        <span className="text-slate-400">وضعیت موجودی در انبار:</span>
+                        <span className="font-semibold text-sky-400">
+                          {isInstant
+                            ? `${selectedProduct.inventory_count.toLocaleString("fa-IR")} عدد آماده تحویل آنی`
+                            : "فعال‌سازی با کارت ارزی"}
+                        </span>
+                      </div>
+
+                      {!hasEnoughBalance && (
+                        <div className="flex justify-between border-t border-amber-500/20 bg-amber-500/10 -mx-3.5 -mb-3.5 p-3 rounded-b-xl text-amber-300 font-bold">
+                          <span>کسری موجودی جهت خرید:</span>
+                          <span>{deficit.toLocaleString("fa-IR")} تومان</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {selectedProduct.fulfillment_type === "MANUAL_ACTIVATION" && !isOutOfStock && (
+                    <div>
+                      <label className="text-xs text-slate-400">
+                        ایمیل اکانت شما جهت شارژ مستقیم یا ارسال لینک فمیلی:
+                      </label>
+                      <input
+                        type="email"
+                        placeholder="name@example.com"
+                        value={targetEmail}
+                        onChange={(e) => setTargetEmail(e.target.value)}
+                        className="mt-1 w-full rounded-xl border border-white/10 bg-[#080b10] px-3 py-2 text-xs text-white focus:border-sky-500 focus:outline-none"
+                      />
+                    </div>
+                  )}
+
+                  {topupStatus && (
+                    <div className="rounded-lg border border-sky-500/20 bg-sky-950/30 p-3 text-xs text-sky-300">
+                      {topupStatus}
+                    </div>
+                  )}
+
+                  <div className="flex flex-col gap-2.5 pt-2">
+                    {hasEnoughBalance ? (
+                      <button
+                        onClick={handleBuyProduct}
+                        disabled={orderProcessing || isOutOfStock}
+                        className="btn-press w-full rounded-xl bg-emerald-500 py-3 text-xs font-bold text-slate-950 hover:bg-emerald-400 disabled:opacity-50 shadow-lg shadow-emerald-500/10 transition-all flex items-center justify-center gap-2"
+                      >
+                        <Check className="h-4 w-4" />
+                        <span>
+                          {orderProcessing
+                            ? "در حال پردازش و کسر از کیف پول..."
+                            : `کسر از موجودی و خرید آنی (${prodPrice.toLocaleString("fa-IR")} تومان)`}
+                        </span>
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleDirectDeficitPay(deficit)}
+                        disabled={orderProcessing || isOutOfStock}
+                        className="btn-press w-full rounded-xl bg-gradient-to-r from-sky-400 to-emerald-400 py-3 text-xs font-extrabold text-slate-950 hover:opacity-90 disabled:opacity-50 shadow-lg shadow-sky-500/15 transition-all flex items-center justify-center gap-2"
+                      >
+                        <CreditCard className="h-4 w-4 text-slate-900" />
+                        <span>
+                          {orderProcessing
+                            ? "در حال اتصال به درگاه شتاب..."
+                            : `💳 پرداخت کسری (${deficit.toLocaleString("fa-IR")} تومان) از شتاب و تحویل فوری`}
+                        </span>
+                      </button>
+                    )}
+
+                    <div className="flex gap-2">
+                      {!hasEnoughBalance && (
+                        <button
+                          onClick={() => {
+                            setTopupAmount(deficit);
+                            setShowWalletModal(true);
+                          }}
+                          className="btn-press flex-1 rounded-xl border border-white/10 px-3 py-2 text-xs font-medium text-slate-300 hover:bg-slate-800"
+                        >
+                          شارژ دلخواه کیف پول
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setShowOrderModal(false)}
+                        className="btn-press flex-1 rounded-xl border border-white/10 px-3 py-2 text-xs font-semibold text-slate-400 hover:bg-slate-800"
+                      >
+                        انصراف
+                      </button>
+                    </div>
                   </div>
                 </div>
-
-                {selectedProduct.fulfillment_type === "MANUAL_ACTIVATION" && (
-                  <div>
-                    <label className="text-xs text-slate-400">
-                      ایمیل اکانت شما جهت شارژ مستقیم یا ارسال لینک فمیلی:
-                    </label>
-                    <input
-                      type="email"
-                      placeholder="name@example.com"
-                      value={targetEmail}
-                      onChange={(e) => setTargetEmail(e.target.value)}
-                      className="mt-1 w-full rounded-xl border border-white/10 bg-[#080b10] px-3 py-2 text-xs text-white focus:border-sky-500 focus:outline-none"
-                    />
+              ) : (
+                <div className="mt-4 space-y-4">
+                  <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-5 text-center">
+                    <CheckCircle2 className="mx-auto h-8 w-8 text-emerald-400" />
+                    <h4 className="mt-2 font-bold text-emerald-400 text-sm">خرید با موفقیت تکمیل شد!</h4>
+                    <p className="mt-1 text-xs text-slate-400">شماره سفارش: #{orderResult.id}</p>
                   </div>
-                )}
 
-                <div className="flex gap-3 pt-2">
+                  {orderResult.items?.[0]?.delivered_data && (
+                    <div className="rounded-xl border border-sky-500/20 bg-sky-950/20 p-4">
+                      <span className="text-[11px] font-semibold text-sky-400">اطلاعات اکانت تحویل داده شده (رمزنگاری‌شده):</span>
+                      <pre className="mt-2 font-mono text-xs text-white select-all whitespace-pre-wrap p-3 rounded-lg bg-black/40 border border-white/5">
+                        {orderResult.items[0].delivered_data}
+                      </pre>
+                    </div>
+                  )}
+
                   <button
-                    onClick={handleBuyProduct}
-                    disabled={orderProcessing}
-                    className="btn-press flex-1 rounded-xl bg-white py-2.5 text-xs font-bold text-slate-950 hover:bg-slate-200 disabled:opacity-50 shadow transition-all"
+                    onClick={() => {
+                      setShowOrderModal(false);
+                      setOrderResult(null);
+                    }}
+                    className="btn-press w-full rounded-xl bg-white py-2.5 text-xs font-bold text-slate-950 hover:bg-slate-200"
                   >
-                    {orderProcessing ? "در حال پردازش خرید..." : "کسر از موجودی و خرید نهایی"}
-                  </button>
-                  <button
-                    onClick={() => setShowOrderModal(false)}
-                    className="btn-press rounded-xl border border-white/10 px-4 py-2.5 text-xs font-semibold text-slate-400 hover:bg-slate-800"
-                  >
-                    انصراف
+                    متوجه شدم و بستن پنجره
                   </button>
                 </div>
-              </div>
-            ) : (
-              <div className="mt-4 space-y-4">
-                <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-5 text-center">
-                  <CheckCircle2 className="mx-auto h-8 w-8 text-emerald-400" />
-                  <h4 className="mt-2 font-bold text-emerald-400 text-sm">خرید با موفقیت تکمیل شد!</h4>
-                  <p className="mt-1 text-xs text-slate-400">شماره سفارش: #{orderResult.id}</p>
-                </div>
-
-                {orderResult.items?.[0]?.delivered_data && (
-                  <div className="rounded-xl border border-white/[0.08] bg-[#080b10] p-3.5">
-                    <span className="text-[10px] font-semibold text-sky-400">اطلاعات اکانت تحویل داده شده:</span>
-                    <pre className="mt-1 font-mono text-xs text-white select-all whitespace-pre-wrap">
-                      {orderResult.items[0].delivered_data}
-                    </pre>
-                  </div>
-                )}
-
-                <button
-                  onClick={() => setShowOrderModal(false)}
-                  className="btn-press w-full rounded-xl bg-white py-2.5 text-xs font-bold text-slate-950 hover:bg-slate-200"
-                >
-                  متوجه شدم
-                </button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

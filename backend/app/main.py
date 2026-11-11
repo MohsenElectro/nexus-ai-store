@@ -20,6 +20,8 @@ async def lifespan(app: FastAPI):
     for col_sql in [
         "ALTER TABLE users ADD COLUMN telegram_id VARCHAR(50)",
         "ALTER TABLE users ADD COLUMN telegram_username VARCHAR(100)",
+        "ALTER TABLE payment_requests ADD COLUMN product_id INTEGER",
+        "ALTER TABLE payment_requests ADD COLUMN target_email VARCHAR(255)",
     ]:
         try:
             async with engine.begin() as conn:

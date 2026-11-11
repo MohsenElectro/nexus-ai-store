@@ -47,7 +47,11 @@ async def topup_wallet(
     Creates an official payment link for Shetab (ZarinPal) or Crypto (USDT).
     """
     callback = request.callback_url or settings.ZARINPAL_CALLBACK_URL
-    description = f"شارژ کیف پول کاربری {current_user.phone_number or current_user.email}"
+    description = (
+        f"پرداخت مستقیم و تحویل اشتراک #{request.product_id}"
+        if request.product_id
+        else f"شارژ کیف پول کاربری {current_user.phone_number or current_user.email or current_user.telegram_id}"
+    )
 
     if request.gateway == PaymentGateway.ZARINPAL:
         init_res = await payment_service.initiate_zarinpal(
@@ -58,12 +62,14 @@ async def topup_wallet(
             user_email=current_user.email,
         )
 
-        # Save payment request
+        # Save payment request with optional direct purchase linkage
         pay_record = PaymentRequest(
             user_id=current_user.id,
             gateway=PaymentGateway.ZARINPAL,
             amount_toman=request.amount_toman,
             authority_or_order_id=init_res["authority"],
+            product_id=request.product_id,
+            target_email=request.target_email,
             status=PaymentStatus.INITIATED,
         )
         db.add(pay_record)
