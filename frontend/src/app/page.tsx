@@ -28,7 +28,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { toast } from "sonner";
-import { api, Product, Wallet as WalletType, Order, ApiKey, getApiBase } from "@/lib/api";
+import { api, Product, Wallet as WalletType, Order, ApiKey, User, getApiBase } from "@/lib/api";
 import ModernHero from "@/components/ModernHero";
 import FeaturedSpotlight from "@/components/FeaturedSpotlight";
 import BentoProductGrid from "@/components/BentoProductGrid";
@@ -45,7 +45,10 @@ export default function Home() {
   const [wallet, setWallet] = useState<WalletType | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+
+  const isAdmin = currentUser?.role === "ADMIN";
 
   // Modals
   const [showWalletModal, setShowWalletModal] = useState<boolean>(false);
@@ -63,6 +66,11 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<"STORE" | "DEVELOPER" | "ORDERS" | "ADMIN">("STORE");
 
   const handleTabChange = (tab: "STORE" | "DEVELOPER" | "ORDERS" | "ADMIN") => {
+    if (tab === "ADMIN" && !isAdmin) {
+      toast.error("دسترسی به بخش انبارداری و مدیریت صرفاً برای مدیران سیستم مجاز است.");
+      setActiveTab("STORE");
+      return;
+    }
     setActiveTab(tab);
     if (typeof window !== "undefined") {
       window.scrollTo({ top: 0, behavior: "instant" });
@@ -80,6 +88,7 @@ export default function Home() {
       const tgUser = tg?.initDataUnsafe?.user;
       const storedTgId = typeof window !== "undefined" ? localStorage.getItem("ai_nexus_tg_id") : null;
       let currentToken = typeof window !== "undefined" ? localStorage.getItem("ai_nexus_token") : null;
+      let activeTgUser: User | null = null;
 
       // 1. Synchronized Telegram WebApp Authentication (Guarantees individual wallet per user)
       if (tg && tg.initData && tgUser?.id) {
@@ -89,6 +98,7 @@ export default function Home() {
             const authRes = await api.authTelegramWebapp(tg.initData, tgUser);
             currentToken = authRes.access_token;
             localStorage.setItem("ai_nexus_tg_id", String(tgUser.id));
+            if (authRes.user) activeTgUser = authRes.user;
           } catch (e) {
             console.error("Telegram WebApp auth error:", e);
           }
@@ -107,12 +117,19 @@ export default function Home() {
         } catch {}
       }
 
-      const [prods, wal, ords, keys] = await Promise.all([
+      const [prods, wal, ords, keys, me] = await Promise.all([
         api.getProducts().catch(() => []),
         api.getWallet().catch(() => null),
         api.getMyOrders().catch(() => []),
         api.getApiKeys().catch(() => []),
+        api.getMe().catch(() => null),
       ]);
+
+      const resolvedUser = activeTgUser || me;
+      setCurrentUser(resolvedUser);
+      if (resolvedUser?.role !== "ADMIN" && activeTab === "ADMIN") {
+        setActiveTab("STORE");
+      }
 
       setProducts(prods);
       setWallet(wal);
@@ -240,7 +257,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-[#090a0f] text-slate-100 bg-subtle-grid pb-24 selection:bg-sky-500/30 selection:text-white">
       {/* 1. Header Navigation Bar (Responsive & Mobile/Desktop Mini-App Optimized) */}
-      <header className="sticky top-0 z-40 w-full border-b border-white/10 bg-[#0c1017]/95 backdrop-blur-xl shadow-lg">
+      <header className="sticky top-0 z-40 w-full border-b border-white/10 bg-[#0c1017] shadow-lg">
         <div className="mx-auto max-w-7xl px-3 sm:px-6">
           <nav
             aria-label="منوی اصلی"
@@ -294,23 +311,25 @@ export default function Home() {
               >
                 سفارش‌های من ({orders.length})
               </button>
-              <button
-                onClick={() => handleTabChange("ADMIN")}
-                className={`rounded-lg px-4 py-2 text-xs font-semibold transition-all btn-press ${
-                  activeTab === "ADMIN"
-                    ? "border border-amber-500/30 bg-amber-500/10 text-amber-400 font-bold"
-                    : "text-amber-400/80 hover:bg-amber-500/10 hover:text-amber-300"
-                }`}
-              >
-                مدیریت و انبارداری
-              </button>
+              {isAdmin && (
+                <button
+                  onClick={() => handleTabChange("ADMIN")}
+                  className={`rounded-lg px-4 py-2 text-xs font-semibold transition-all btn-press ${
+                    activeTab === "ADMIN"
+                      ? "border border-amber-500/30 bg-amber-500/10 text-amber-400 font-bold"
+                      : "text-amber-400/80 hover:bg-amber-500/10 hover:text-amber-300"
+                  }`}
+                >
+                  مدیریت و انبارداری
+                </button>
+              )}
             </div>
 
             {/* Wallet Balance Pill */}
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setShowWalletModal(true)}
-                className="btn-press flex items-center gap-1.5 rounded-xl border border-white/10 bg-slate-900/90 px-2.5 py-1.5 text-xs font-medium text-white hover:border-white/20 hover:bg-slate-800 shadow-sm transition-all sm:gap-2 sm:px-3.5 sm:py-2"
+                className="btn-press flex items-center gap-1.5 rounded-xl border border-white/10 bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-white hover:border-white/20 hover:bg-slate-800 shadow-sm transition-all sm:gap-2 sm:px-3.5 sm:py-2"
               >
                 <CreditCard className="h-3.5 w-3.5 text-sky-400 sm:h-4 sm:w-4 shrink-0" />
                 <span className="text-[11px] sm:text-xs whitespace-nowrap">
@@ -325,7 +344,7 @@ export default function Home() {
         </div>
 
         {/* Navigation Sub-Bar (Mobile and Telegram Desktop < lg) */}
-        <div className="border-t border-white/5 bg-[#06080d]/95 backdrop-blur-md lg:hidden">
+        <div className="border-t border-white/5 bg-[#0a0d14] lg:hidden">
           <div className="mx-auto flex max-w-7xl items-center justify-around sm:justify-center sm:gap-2 overflow-x-auto no-scrollbar px-2 py-1.5">
             <button
               onClick={() => handleTabChange("STORE")}
@@ -357,16 +376,18 @@ export default function Home() {
             >
               📦 سفارش‌ها ({orders.length})
             </button>
-            <button
-              onClick={() => handleTabChange("ADMIN")}
-              className={`shrink-0 rounded-lg px-3 py-1 text-xs font-semibold transition-all btn-press ${
-                activeTab === "ADMIN"
-                  ? "border border-amber-500/40 bg-amber-500/20 text-amber-300 font-bold"
-                  : "text-amber-400/80 hover:text-amber-300"
-              }`}
-            >
-              👑 انبار و ادمین
-            </button>
+            {isAdmin && (
+              <button
+                onClick={() => handleTabChange("ADMIN")}
+                className={`shrink-0 rounded-lg px-3 py-1 text-xs font-semibold transition-all btn-press ${
+                  activeTab === "ADMIN"
+                    ? "border border-amber-500/40 bg-amber-500/20 text-amber-300 font-bold"
+                    : "text-amber-400/80 hover:text-amber-300"
+                }`}
+              >
+                👑 انبار و ادمین
+              </button>
+            )}
           </div>
         </div>
       </header>
@@ -503,7 +524,7 @@ export default function Home() {
         )}
 
         {/* 4. Admin Tab */}
-        {activeTab === "ADMIN" && (
+        {isAdmin && activeTab === "ADMIN" && (
           <AdminDashboard products={products} onRefreshProducts={initData} />
         )}
       </main>

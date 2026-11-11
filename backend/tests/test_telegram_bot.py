@@ -295,15 +295,19 @@ async def test_telegram_webapp_auth_user_isolation():
     async with lifespan(app):
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
+            import random
+            rand_a = random.randint(100000000, 999999999)
+            rand_b = random.randint(100000000, 999999999)
+
             # 1. User A logs in from Telegram
-            user_a_tg = {"id": 111222333, "first_name": "کاربر اول", "username": "user_one"}
+            user_a_tg = {"id": rand_a, "first_name": "کاربر اول", "username": f"user_{rand_a}"}
             auth_a = await client.post(
                 "/api/v1/auth/telegram-webapp",
                 json={"init_data": "auth_date=1710000000&hash=mockhash", "user": user_a_tg},
             )
             assert auth_a.status_code == 200
             token_a = auth_a.json()["access_token"]
-            assert auth_a.json()["user"]["telegram_id"] == "111222333"
+            assert auth_a.json()["user"]["telegram_id"] == str(rand_a)
 
             # Check User A's initial wallet
             wallet_a_resp = await client.get(
@@ -334,14 +338,14 @@ async def test_telegram_webapp_auth_user_isolation():
             assert wallet_a_updated.json()["balance_toman"] == 250000
 
             # 2. User B logs in from another Telegram account
-            user_b_tg = {"id": 999888777, "first_name": "کاربر دوم", "username": "user_two"}
+            user_b_tg = {"id": rand_b, "first_name": "کاربر دوم", "username": f"user_{rand_b}"}
             auth_b = await client.post(
                 "/api/v1/auth/telegram-webapp",
                 json={"init_data": "auth_date=1710000000&hash=mockhash", "user": user_b_tg},
             )
             assert auth_b.status_code == 200
             token_b = auth_b.json()["access_token"]
-            assert auth_b.json()["user"]["telegram_id"] == "999888777"
+            assert auth_b.json()["user"]["telegram_id"] == str(rand_b)
 
             # Verify User B's wallet is 0 and NOT sharing User A's 250,000!
             wallet_b_resp = await client.get(
