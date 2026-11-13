@@ -18,6 +18,8 @@ class Order(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     total_toman = Column(BigInteger, default=0, nullable=False)
     total_usdt = Column(Float, default=0.0, nullable=False)
+    discount_toman = Column(BigInteger, default=0, nullable=False)
+    discount_code = Column(String(50), nullable=True)
     status = Column(Enum(OrderStatus), default=OrderStatus.PENDING_PAYMENT, nullable=False, index=True)
     
     # Required if product requires manual account charge (e.g. user's own email)

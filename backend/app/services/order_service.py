@@ -9,6 +9,8 @@ from app.models.wallet import TransactionType
 from app.core.security import decrypt_vault_payload
 from app.core.database import utc_now
 from app.services.wallet_service import wallet_service
+from app.services.discount_service import discount_service
+from app.models.discount import DiscountCode
 
 class OrderService:
     @staticmethod
@@ -18,6 +20,7 @@ class OrderService:
         product_id: int,
         target_email: Optional[str] = None,
         customer_notes: Optional[str] = None,
+        discount_code_str: Optional[str] = None,
     ) -> Order:
         # 1. Fetch product
         res = await db.execute(select(Product).where(Product.id == product_id))
@@ -50,23 +53,52 @@ class OrderService:
                     detail="موجودی انبار این محصول در حال حاضر به اتمام رسیده است. به زودی شارژ خواهد شد.",
                 )
 
-        # 2. Atomically deduct cost from user wallet
+        # 2. Evaluate discount code if provided
+        discount_toman = 0
+        applied_code = None
+        final_price_toman = product.price_toman
+
+        if discount_code_str:
+            discount_calc = await discount_service.validate_and_calculate_discount(
+                db=db,
+                code_str=discount_code_str,
+                order_amount_toman=product.price_toman,
+            )
+            if discount_calc["valid"]:
+                discount_toman = discount_calc["discount_toman"]
+                final_price_toman = discount_calc["final_amount_toman"]
+                applied_code = discount_calc["code"]
+
+                # Increment used count atomically
+                await db.execute(
+                    update(DiscountCode)
+                    .where(DiscountCode.code == applied_code)
+                    .values(used_count=DiscountCode.used_count + 1)
+                )
+
+        # 3. Atomically deduct cost from user wallet
+        tx_desc = f"خرید {product.title}"
+        if applied_code:
+            tx_desc += f" (با تخفیف {discount_toman:,} تومان - کد {applied_code})"
+
         await wallet_service.debit_wallet_atomic(
             db=db,
             user_id=user_id,
-            amount_toman=product.price_toman,
+            amount_toman=final_price_toman,
             tx_type=TransactionType.PURCHASE,
-            description=f"خرید {product.title}",
+            description=tx_desc,
         )
 
-        # 3. Create initial Order
+        # 4. Create initial Order
         is_instant = product.fulfillment_type == FulfillmentType.INSTANT_VAULT
         order_status = OrderStatus.COMPLETED if is_instant else OrderStatus.AWAITING_MANUAL_FULFILLMENT
 
         order = Order(
             user_id=user_id,
-            total_toman=product.price_toman,
+            total_toman=final_price_toman,
             total_usdt=product.price_usdt,
+            discount_toman=discount_toman,
+            discount_code=applied_code,
             status=order_status,
             target_email=target_email,
             customer_notes=customer_notes,

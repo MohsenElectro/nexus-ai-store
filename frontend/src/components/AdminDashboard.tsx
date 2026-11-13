@@ -19,9 +19,11 @@ import {
   AlertTriangle,
   UserCheck,
   Package,
+  Tag,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { api, Product, Order } from "@/lib/api";
+import { api, Product, Order, DiscountCode } from "@/lib/api";
 
 interface AdminDashboardProps {
   products: Product[];
@@ -29,7 +31,19 @@ interface AdminDashboardProps {
 }
 
 export default function AdminDashboard({ products, onRefreshProducts }: AdminDashboardProps) {
-  const [activeSubTab, setActiveSubTab] = useState<"ORDERS" | "VAULT" | "PRICES" | "TELEGRAM" | "SETTINGS">("ORDERS");
+  const [activeSubTab, setActiveSubTab] = useState<"ORDERS" | "VAULT" | "PRICES" | "DISCOUNTS" | "TELEGRAM" | "SETTINGS">("ORDERS");
+  
+  // Discount Codes State
+  const [discountCodes, setDiscountCodes] = useState<DiscountCode[]>([]);
+  const [newDiscount, setNewDiscount] = useState({
+    code: "",
+    discount_type: "PERCENT" as "PERCENT" | "FIXED",
+    value: 20,
+    max_amount_toman: 300000,
+    min_order_toman: 200000,
+    usage_limit: 100,
+  });
+  const [creatingDiscount, setCreatingDiscount] = useState<boolean>(false);
   
   // Stats
   const [stats, setStats] = useState<{
@@ -125,13 +139,15 @@ export default function AdminDashboard({ products, onRefreshProducts }: AdminDas
 
   async function loadAdminData() {
     try {
-      const [st, pend, sett] = await Promise.all([
+      const [st, pend, sett, disc] = await Promise.all([
         api.getAdminStats().catch(() => null),
         api.getPendingManualOrders().catch(() => []),
         api.getGatewaySettings().catch(() => null),
+        api.getDiscountCodes().catch(() => []),
       ]);
       if (st) setStats(st);
       setPendingOrders(pend);
+      setDiscountCodes(disc);
       if (sett) {
         setGatewaySettings((prev) => ({
           ...prev,
@@ -155,6 +171,58 @@ export default function AdminDashboard({ products, onRefreshProducts }: AdminDas
       });
       setEditingPrices(pMap);
     } catch {}
+  }
+
+  async function handleCreateDiscount() {
+    if (!newDiscount.code.trim()) {
+      toast.error("لطفاً کد تخفیف را وارد کنید.");
+      return;
+    }
+    setCreatingDiscount(true);
+    try {
+      await api.createDiscountCode({
+        code: newDiscount.code.trim().toUpperCase(),
+        discount_type: newDiscount.discount_type,
+        value: Number(newDiscount.value),
+        max_amount_toman:
+          newDiscount.discount_type === "PERCENT" && newDiscount.max_amount_toman > 0
+            ? Number(newDiscount.max_amount_toman)
+            : null,
+        min_order_toman: Number(newDiscount.min_order_toman) || 0,
+        usage_limit: newDiscount.usage_limit > 0 ? Number(newDiscount.usage_limit) : null,
+        is_active: true,
+      });
+      toast.success(`کد تخفیف ${newDiscount.code.toUpperCase()} با موفقیت ساخته شد.`);
+      setNewDiscount({ ...newDiscount, code: "" });
+      const disc = await api.getDiscountCodes();
+      setDiscountCodes(disc);
+    } catch (err: any) {
+      toast.error(err.message || "خطا در ساخت کد تخفیف");
+    } finally {
+      setCreatingDiscount(false);
+    }
+  }
+
+  async function handleToggleDiscount(id: number) {
+    try {
+      await api.toggleDiscountCode(id);
+      const disc = await api.getDiscountCodes();
+      setDiscountCodes(disc);
+      toast.success("وضعیت کد تخفیف تغییر یافت.");
+    } catch (err: any) {
+      toast.error(err.message || "خطا در تغییر وضعیت کد");
+    }
+  }
+
+  async function handleDeleteDiscount(id: number) {
+    try {
+      await api.deleteDiscountCode(id);
+      const disc = await api.getDiscountCodes();
+      setDiscountCodes(disc);
+      toast.success("کد تخفیف حذف گردید.");
+    } catch (err: any) {
+      toast.error(err.message || "خطا در حذف کد تخفیف");
+    }
   }
 
   async function handleFulfill(orderId: number) {
@@ -322,6 +390,7 @@ export default function AdminDashboard({ products, onRefreshProducts }: AdminDas
           { id: "ORDERS", label: `صف شارژ دستی (${pendingOrders.length})`, icon: Clock },
           { id: "VAULT", label: "تزریق اکانت به انبار (AES-256)", icon: Database },
           { id: "PRICES", label: "مدیریت محصولات و قیمت‌ها", icon: Package },
+          { id: "DISCOUNTS", label: `کدهای تخفیف (${discountCodes.length})`, icon: Tag },
           { id: "TELEGRAM", label: "پیش‌نمایش ربات تلگرام", icon: Send },
           { id: "SETTINGS", label: "تنظیمات درگاه و تسویه", icon: Settings },
         ].map((tab) => {
@@ -939,6 +1008,174 @@ export default function AdminDashboard({ products, onRefreshProducts }: AdminDas
               {settingsLoading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4 text-slate-800" />}
               ذخیره تنظیمات درگاه‌ها و ربات
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Subtab 6: Discount Codes Management */}
+      {activeSubTab === "DISCOUNTS" && (
+        <div className="space-y-6">
+          {/* Create New Discount Code */}
+          <div className="rounded-2xl border border-white/[0.08] bg-[#0c1017] p-6 shadow-xl">
+            <h3 className="text-base font-bold text-white flex items-center gap-2">
+              <Tag className="h-4 w-4 text-sky-400" />
+              <span>ساخت کد تخفیف و کوپن بازاریابی جدید</span>
+            </h3>
+            <p className="mt-1 text-xs text-slate-400">
+              کدهای تخفیف درصدی یا مبلغ ثابت برای کمپین‌های تلگرام، معرفی دوستان یا مشتریان ویژه بسازید.
+            </p>
+
+            <div className="mt-4 grid gap-4 sm:grid-cols-3">
+              <div>
+                <label className="text-xs font-semibold text-slate-400">کد تخفیف (لاتین):</label>
+                <input
+                  type="text"
+                  dir="ltr"
+                  placeholder="NEXUS30"
+                  value={newDiscount.code}
+                  onChange={(e) => setNewDiscount({ ...newDiscount, code: e.target.value.toUpperCase() })}
+                  className="mt-1 w-full rounded-xl border border-white/10 bg-[#080b10] px-3 py-2 text-xs font-mono text-white uppercase focus:border-sky-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-400">نوع تخفیف:</label>
+                <select
+                  value={newDiscount.discount_type}
+                  onChange={(e) =>
+                    setNewDiscount({ ...newDiscount, discount_type: e.target.value as "PERCENT" | "FIXED" })
+                  }
+                  className="mt-1 w-full rounded-xl border border-white/10 bg-[#080b10] px-3 py-2 text-xs text-white focus:border-sky-500 focus:outline-none"
+                >
+                  <option value="PERCENT">درصدی (%)</option>
+                  <option value="FIXED">مبلغ ثابت (تومان)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-400">
+                  {newDiscount.discount_type === "PERCENT" ? "درصد تخفیف (۱ تا ۱۰۰):" : "مبلغ تخفیف (تومان):"}
+                </label>
+                <input
+                  type="number"
+                  value={newDiscount.value}
+                  onChange={(e) => setNewDiscount({ ...newDiscount, value: Number(e.target.value) })}
+                  className="mt-1 w-full rounded-xl border border-white/10 bg-[#080b10] px-3 py-2 text-xs text-white focus:border-sky-500 focus:outline-none"
+                />
+              </div>
+
+              {newDiscount.discount_type === "PERCENT" && (
+                <div>
+                  <label className="text-xs font-semibold text-slate-400">سقف تخفیف (تومان):</label>
+                  <input
+                    type="number"
+                    value={newDiscount.max_amount_toman}
+                    onChange={(e) => setNewDiscount({ ...newDiscount, max_amount_toman: Number(e.target.value) })}
+                    className="mt-1 w-full rounded-xl border border-white/10 bg-[#080b10] px-3 py-2 text-xs text-white focus:border-sky-500 focus:outline-none"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="text-xs font-semibold text-slate-400">حداقل مبلغ خرید (تومان):</label>
+                <input
+                  type="number"
+                  value={newDiscount.min_order_toman}
+                  onChange={(e) => setNewDiscount({ ...newDiscount, min_order_toman: Number(e.target.value) })}
+                  className="mt-1 w-full rounded-xl border border-white/10 bg-[#080b10] px-3 py-2 text-xs text-white focus:border-sky-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-400">سقف تعداد کل استفاده:</label>
+                <input
+                  type="number"
+                  value={newDiscount.usage_limit}
+                  onChange={(e) => setNewDiscount({ ...newDiscount, usage_limit: Number(e.target.value) })}
+                  className="mt-1 w-full rounded-xl border border-white/10 bg-[#080b10] px-3 py-2 text-xs text-white focus:border-sky-500 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <button
+              onClick={handleCreateDiscount}
+              disabled={creatingDiscount}
+              className="mt-4 btn-press flex items-center gap-2 rounded-xl bg-white px-5 py-2.5 text-xs font-bold text-slate-950 hover:bg-slate-200 disabled:opacity-50"
+            >
+              <Plus className="h-4 w-4 text-slate-800" />
+              <span>{creatingDiscount ? "در حال ثبت..." : "ثبت و فعال‌سازی کد تخفیف"}</span>
+            </button>
+          </div>
+
+          {/* Existing Discount Codes List */}
+          <div className="rounded-2xl border border-white/[0.08] bg-[#0c1017] p-6 shadow-xl">
+            <h3 className="text-base font-bold text-white mb-4">لیست کدهای تخفیف ثبت‌شده</h3>
+            {discountCodes.length === 0 ? (
+              <p className="text-xs text-slate-500">هنوز کد تخفیفی ثبت نشده است.</p>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2">
+                {discountCodes.map((dc) => (
+                  <div
+                    key={dc.id}
+                    className={`rounded-xl border p-4 flex flex-col justify-between gap-3 ${
+                      dc.is_active
+                        ? "border-emerald-500/20 bg-emerald-500/5"
+                        : "border-white/5 bg-slate-900/40 opacity-60"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-sm font-black text-white bg-black/40 px-2.5 py-1 rounded-lg border border-white/10">
+                        {dc.code}
+                      </span>
+                      <span
+                        className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
+                          dc.is_active
+                            ? "bg-emerald-500/20 text-emerald-300"
+                            : "bg-slate-800 text-slate-400"
+                        }`}
+                      >
+                        {dc.is_active ? "فعال" : "غیرفعال"}
+                      </span>
+                    </div>
+
+                    <div className="text-xs text-slate-300 space-y-1">
+                      <div>
+                        مقدار تخفیف:{" "}
+                        <strong className="text-sky-400">
+                          {dc.discount_type === "PERCENT"
+                            ? `${dc.value.toLocaleString("fa-IR")}٪`
+                            : `${dc.value.toLocaleString("fa-IR")} تومان`}
+                        </strong>
+                        {dc.max_amount_toman
+                          ? ` (سقف: ${dc.max_amount_toman.toLocaleString("fa-IR")} ت)`
+                          : ""}
+                      </div>
+                      <div className="text-[11px] text-slate-400">
+                        حداقل سفارش: {dc.min_order_toman.toLocaleString("fa-IR")} ت | مصرف:{" "}
+                        {dc.used_count.toLocaleString("fa-IR")} از{" "}
+                        {dc.usage_limit ? dc.usage_limit.toLocaleString("fa-IR") : "نامحدود"}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2 border-t border-white/5 pt-2.5">
+                      <button
+                        onClick={() => handleToggleDiscount(dc.id)}
+                        className="btn-press rounded-lg border border-white/10 bg-slate-900 px-3 py-1 text-[11px] font-medium text-slate-300 hover:bg-slate-800"
+                      >
+                        {dc.is_active ? "غیرفعال کردن" : "فعال‌سازی"}
+                      </button>
+                      <button
+                        onClick={() => handleDeleteDiscount(dc.id)}
+                        className="btn-press rounded-lg border border-rose-500/20 bg-rose-500/10 p-1.5 text-rose-400 hover:bg-rose-500/20"
+                        title="حذف کد"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

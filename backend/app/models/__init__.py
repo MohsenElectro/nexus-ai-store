@@ -5,6 +5,7 @@ from app.models.product import Product, ProductCategory, FulfillmentType, Licens
 from app.models.order import Order, OrderItem, OrderStatus
 from app.models.api_key import ApiKey, TokenUsageLog
 from app.models.payment import PaymentRequest, PaymentGateway, PaymentStatus
+from app.models.discount import DiscountCode, DiscountType
 
 __all__ = [
     "Base",
@@ -27,4 +28,6 @@ __all__ = [
     "PaymentRequest",
     "PaymentGateway",
     "PaymentStatus",
+    "DiscountCode",
+    "DiscountType",
 ]

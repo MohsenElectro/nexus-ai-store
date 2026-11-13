@@ -70,6 +70,7 @@ async def topup_wallet(
             authority_or_order_id=init_res["authority"],
             product_id=request.product_id,
             target_email=request.target_email,
+            discount_code=request.discount_code,
             status=PaymentStatus.INITIATED,
         )
         db.add(pay_record)

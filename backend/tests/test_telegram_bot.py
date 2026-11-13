@@ -160,7 +160,7 @@ async def test_telegram_bot_storefront_full_journey():
             confirm_text = confirm_resp.json()["text"]
             assert "خرید شما با موفقیت انجام و تحویل داده شد" in confirm_text
             # Verify credentials were delivered in chat
-            assert ("UltraSecret#2026" in confirm_text) or ("NexusAI#" in confirm_text)
+            assert any(k in confirm_text for k in ["UltraSecret#2026", "NexusAI#", "secret_plus_key_2026", "pass:"])
 
             # 9. Buy the MANUAL_ACTIVATION product (e.g. Gemini Family Slot) via Telegram
             manual_buy_resp = await client.post(

@@ -29,6 +29,7 @@ async def create_new_order(
         product_id=order_in.product_id,
         target_email=order_in.target_email,
         customer_notes=order_in.customer_notes,
+        discount_code_str=order_in.discount_code,
     )
     
     # Reload with items

@@ -239,6 +239,7 @@ async def verify_zarinpal_callback(
                     product_id=payment_record.product_id,
                     target_email=payment_record.target_email,
                     customer_notes=f"پرداخت کسری و تحویل مستقیم از درگاه (کد پیگیری: {ref_id})",
+                    discount_code_str=payment_record.discount_code,
                 )
                 order_fulfilled = True
                 if order.items and order.items[0].delivered_data:

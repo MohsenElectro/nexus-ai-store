@@ -50,6 +50,8 @@ export interface Order {
   id: number;
   total_toman: number;
   total_usdt: number;
+  discount_toman?: number;
+  discount_code?: string;
   status: "PENDING_PAYMENT" | "PAID_PROCESSING" | "AWAITING_MANUAL_FULFILLMENT" | "COMPLETED" | "CANCELLED";
   target_email?: string;
   customer_notes?: string;
@@ -62,6 +64,30 @@ export interface Order {
     unit_price_toman: number;
     delivered_data?: string;
   }>;
+}
+
+export interface DiscountCode {
+  id: number;
+  code: string;
+  discount_type: "PERCENT" | "FIXED";
+  value: number;
+  max_amount_toman?: number;
+  min_order_toman: number;
+  usage_limit?: number;
+  used_count: number;
+  expires_at?: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface DiscountValidationResult {
+  valid: boolean;
+  code: string;
+  discount_type?: "PERCENT" | "FIXED";
+  value?: number;
+  discount_toman: number;
+  final_amount_toman: number;
+  message: string;
 }
 
 export interface ApiKey {
@@ -326,7 +352,8 @@ class ApiClient {
     amountToman: number,
     gateway = "ZARINPAL",
     productId?: number,
-    targetEmail?: string
+    targetEmail?: string,
+    discountCode?: string
   ): Promise<{ payment_url?: string; authority?: string; [key: string]: any }> {
     return this.request("/wallet/topup", {
       method: "POST",
@@ -335,15 +362,64 @@ class ApiClient {
         gateway,
         product_id: productId,
         target_email: targetEmail,
+        discount_code: discountCode,
       }),
     });
   }
 
   // Orders
-  async createOrder(productId: number, targetEmail?: string, notes?: string): Promise<Order> {
+  async createOrder(productId: number, targetEmail?: string, notes?: string, discountCode?: string): Promise<Order> {
     return this.request<Order>("/orders/", {
       method: "POST",
-      body: JSON.stringify({ product_id: productId, target_email: targetEmail, customer_notes: notes }),
+      body: JSON.stringify({
+        product_id: productId,
+        target_email: targetEmail,
+        customer_notes: notes,
+        discount_code: discountCode,
+      }),
+    });
+  }
+
+  // Discounts
+  async validateDiscountCode(code: string, orderAmountToman: number): Promise<DiscountValidationResult> {
+    return this.request<DiscountValidationResult>("/discounts/validate", {
+      method: "POST",
+      body: JSON.stringify({ code, order_amount_toman: orderAmountToman }),
+    });
+  }
+
+  async getDiscountCodes(): Promise<DiscountCode[]> {
+    try {
+      return await this.request<DiscountCode[]>("/discounts/");
+    } catch {
+      return [];
+    }
+  }
+
+  async createDiscountCode(data: {
+    code: string;
+    discount_type: "PERCENT" | "FIXED";
+    value: number;
+    max_amount_toman?: number | null;
+    min_order_toman?: number;
+    usage_limit?: number | null;
+    is_active?: boolean;
+  }): Promise<DiscountCode> {
+    return this.request<DiscountCode>("/discounts/", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async toggleDiscountCode(codeId: number): Promise<DiscountCode> {
+    return this.request<DiscountCode>(`/discounts/${codeId}/toggle`, {
+      method: "PATCH",
+    });
+  }
+
+  async deleteDiscountCode(codeId: number): Promise<any> {
+    return this.request(`/discounts/${codeId}`, {
+      method: "DELETE",
     });
   }
 

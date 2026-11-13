@@ -7,6 +7,7 @@ class OrderCreate(BaseModel):
     product_id: int
     target_email: Optional[str] = Field(None, json_schema_extra={"example": "user@gmail.com"}, description="ایمیل مشتری در صورتی که سفارش نیاز به شارژ مستقیم داشته باشد")
     customer_notes: Optional[str] = Field(None, json_schema_extra={"example": "لطفاً بعد از شارژ اطلاع دهید"})
+    discount_code: Optional[str] = Field(None, json_schema_extra={"example": "WELCOME"}, description="کد تخفیف اختصاصی یا عمومی")
 
 class OrderItemOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -25,6 +26,8 @@ class OrderOut(BaseModel):
     user_id: int
     total_toman: int
     total_usdt: float
+    discount_toman: int = 0
+    discount_code: Optional[str] = None
     status: OrderStatus
     target_email: Optional[str]
     customer_notes: Optional[str]

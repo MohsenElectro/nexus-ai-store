@@ -32,3 +32,4 @@ class WalletTopupRequest(BaseModel):
     callback_url: Optional[str] = None
     product_id: Optional[int] = None
     target_email: Optional[str] = None
+    discount_code: Optional[str] = None

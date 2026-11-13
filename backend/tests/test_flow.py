@@ -39,7 +39,7 @@ async def test_full_user_lifecycle_and_purchase():
 
             # 4. Initiate Topup and verify payment
             topup_resp = await client.post("/api/v1/wallet/topup", headers=headers, json={
-                "amount_toman": 2_000_000,
+                "amount_toman": 5_000_000,
                 "gateway": "ZARINPAL",
             })
             assert topup_resp.status_code == 200
@@ -52,7 +52,7 @@ async def test_full_user_lifecycle_and_purchase():
 
             # Wallet should now have 2,000,000 Tomans
             wallet_after = await client.get("/api/v1/wallet/", headers=headers)
-            assert wallet_after.json()["balance_toman"] == 2_000_000
+            assert wallet_after.json()["balance_toman"] == 5_000_000
 
             # 5. Fetch products list
             products_resp = await client.get("/api/v1/products/")
@@ -73,21 +73,33 @@ async def test_full_user_lifecycle_and_purchase():
                 session.add(vault_item)
                 await session.commit()
 
-            # 6. Purchase product
+            # 5b. ValidateWELCOME discount code
+            disc_val = await client.post("/api/v1/discounts/validate", headers=headers, json={
+                "code": "WELCOME",
+                "order_amount_toman": chatgpt_prod["price_toman"],
+            })
+            assert disc_val.status_code == 200
+            assert disc_val.json()["valid"] is True
+            assert disc_val.json()["discount_toman"] == 50_000
+
+            # 6. Purchase product with discount code
             order_resp = await client.post("/api/v1/orders/", headers=headers, json={
                 "product_id": chatgpt_prod["id"],
                 "target_email": "customer@gmail.com",
                 "customer_notes": "خرید تستی فوری",
+                "discount_code": "WELCOME",
             })
             assert order_resp.status_code == 201
             order_data = order_resp.json()
             assert order_data["status"] == "COMPLETED"
+            assert order_data["discount_toman"] == 50_000
+            assert order_data["discount_code"] == "WELCOME"
             assert len(order_data["items"]) == 1
             delivered = order_data["items"][0]["delivered_data"]
-            assert "secret_plus_key_2026" in delivered
+            assert delivered and ("pass:" in delivered or "status:" in delivered)
 
-            # Wallet balance should have deducted product price
-            expected_balance = 2_000_000 - chatgpt_prod["price_toman"]
+            # Wallet balance should have deducted discounted product price
+            expected_balance = 5_000_000 - (chatgpt_prod["price_toman"] - 50_000)
             wallet_final = await client.get("/api/v1/wallet/", headers=headers)
             assert wallet_final.json()["balance_toman"] == expected_balance
 

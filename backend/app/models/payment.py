@@ -35,6 +35,7 @@ class PaymentRequest(Base):
     # Optional linked product purchase for direct deficit checkout
     product_id = Column(Integer, nullable=True)
     target_email = Column(String(255), nullable=True)
+    discount_code = Column(String(50), nullable=True)
     
     created_at = Column(DateTime, default=utc_now, nullable=False)
     verified_at = Column(DateTime, nullable=True)

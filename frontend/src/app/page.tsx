@@ -61,6 +61,13 @@ export default function Home() {
   const [targetEmail, setTargetEmail] = useState<string>("");
   const [orderProcessing, setOrderProcessing] = useState<boolean>(false);
   const [orderResult, setOrderResult] = useState<Order | null>(null);
+  const [discountInput, setDiscountInput] = useState<string>("");
+  const [appliedDiscount, setAppliedDiscount] = useState<{
+    code: string;
+    discount_toman: number;
+    final_amount_toman: number;
+  } | null>(null);
+  const [validatingDiscount, setValidatingDiscount] = useState<boolean>(false);
 
   // Active Tab
   const [activeTab, setActiveTab] = useState<"STORE" | "DEVELOPER" | "ORDERS" | "ADMIN">("STORE");
@@ -176,11 +183,43 @@ export default function Home() {
     }
   }
 
+  async function handleApplyDiscount() {
+    if (!selectedProduct || !discountInput.trim()) return;
+    setValidatingDiscount(true);
+    try {
+      const res = await api.validateDiscountCode(
+        discountInput.trim(),
+        selectedProduct.price_toman
+      );
+      if (res.valid) {
+        setAppliedDiscount({
+          code: res.code,
+          discount_toman: res.discount_toman,
+          final_amount_toman: res.final_amount_toman,
+        });
+        toast.success(res.message);
+      } else {
+        setAppliedDiscount(null);
+        toast.error(res.message || "کد تخفیف معتبر نیست");
+      }
+    } catch (err: any) {
+      setAppliedDiscount(null);
+      toast.error(err.message || "خطا در بررسی کد تخفیف");
+    } finally {
+      setValidatingDiscount(false);
+    }
+  }
+
   async function handleBuyProduct() {
     if (!selectedProduct) return;
     setOrderProcessing(true);
     try {
-      const order = await api.createOrder(selectedProduct.id, targetEmail);
+      const order = await api.createOrder(
+        selectedProduct.id,
+        targetEmail,
+        undefined,
+        appliedDiscount?.code
+      );
       setOrderResult(order);
       toast.success("سفارش با موفقیت ثبت و تحویل داده شد!");
       const [updatedWallet, updatedOrders] = await Promise.all([
@@ -205,7 +244,8 @@ export default function Home() {
         deficitAmount,
         selectedGateway,
         selectedProduct.id,
-        targetEmail
+        targetEmail,
+        appliedDiscount?.code
       );
       if (res.payment_url) {
         setTopupStatus("در حال شبیه‌سازی تایید تراکنش بانکی و تحویل آنی لایسنس...");
@@ -226,7 +266,7 @@ export default function Home() {
             if (vData.delivered_data) {
               setOrderResult({
                 id: updatedOrders[0]?.id || Date.now(),
-                total_toman: selectedProduct.price_toman,
+                total_toman: appliedDiscount ? appliedDiscount.final_amount_toman : selectedProduct.price_toman,
                 total_usdt: selectedProduct.price_usdt,
                 status: "COMPLETED",
                 items: [
@@ -662,7 +702,9 @@ export default function Home() {
       {/* Order Purchase Modal */}
       {showOrderModal && selectedProduct && (() => {
         const currentBal = wallet?.balance_toman || 0;
-        const prodPrice = selectedProduct.price_toman;
+        const basePrice = selectedProduct.price_toman;
+        const discountToman = appliedDiscount ? appliedDiscount.discount_toman : 0;
+        const prodPrice = appliedDiscount ? appliedDiscount.final_amount_toman : basePrice;
         const isInstant = selectedProduct.fulfillment_type === "INSTANT_VAULT";
         const isOutOfStock = isInstant && (selectedProduct.inventory_count <= 0);
         const hasEnoughBalance = currentBal >= prodPrice;
@@ -682,35 +724,88 @@ export default function Home() {
                       <span>موجودی انبار این پکیج در حال حاضر به پایان رسیده است. به زودی توسط مدیریت شارژ خواهد شد.</span>
                     </div>
                   ) : (
-                    <div className="rounded-xl border border-white/[0.08] bg-[#080b10] p-3.5 text-xs space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">مبلغ سفارش:</span>
-                        <span className="font-bold text-white">
-                          {prodPrice.toLocaleString("fa-IR")} تومان
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">موجودی کیف پول شما:</span>
-                        <span className={`font-semibold ${hasEnoughBalance ? "text-emerald-400" : "text-amber-400"}`}>
-                          {currentBal.toLocaleString("fa-IR")} تومان
-                        </span>
-                      </div>
-                      <div className="flex justify-between border-t border-white/5 pt-2">
-                        <span className="text-slate-400">وضعیت موجودی در انبار:</span>
-                        <span className="font-semibold text-sky-400">
-                          {isInstant
-                            ? `${selectedProduct.inventory_count.toLocaleString("fa-IR")} عدد آماده تحویل آنی`
-                            : "فعال‌سازی با کارت ارزی"}
-                        </span>
+                    <>
+                      <div className="rounded-xl border border-white/[0.08] bg-[#080b10] p-3.5 text-xs space-y-2">
+                        <div className="flex justify-between">
+                          <span className="text-slate-400">مبلغ پایه سفارش:</span>
+                          <span className={`font-bold ${discountToman > 0 ? "line-through text-slate-500" : "text-white"}`}>
+                            {basePrice.toLocaleString("fa-IR")} تومان
+                          </span>
+                        </div>
+                        {discountToman > 0 && (
+                          <div className="flex justify-between text-emerald-400 font-semibold">
+                            <span>تخفیف اعمال‌شده ({appliedDiscount?.code}):</span>
+                            <span>- {discountToman.toLocaleString("fa-IR")} تومان</span>
+                          </div>
+                        )}
+                        {discountToman > 0 && (
+                          <div className="flex justify-between border-t border-white/5 pt-1.5 font-extrabold text-white">
+                            <span>مبلغ نهایی قابل پرداخت:</span>
+                            <span className="text-emerald-400">{prodPrice.toLocaleString("fa-IR")} تومان</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between">
+                          <span className="text-slate-400">موجودی کیف پول شما:</span>
+                          <span className={`font-semibold ${hasEnoughBalance ? "text-emerald-400" : "text-amber-400"}`}>
+                            {currentBal.toLocaleString("fa-IR")} تومان
+                          </span>
+                        </div>
+                        <div className="flex justify-between border-t border-white/5 pt-2">
+                          <span className="text-slate-400">وضعیت موجودی در انبار:</span>
+                          <span className="font-semibold text-sky-400">
+                            {isInstant
+                              ? `${selectedProduct.inventory_count.toLocaleString("fa-IR")} عدد آماده تحویل آنی`
+                              : "فعال‌سازی با کارت ارزی"}
+                          </span>
+                        </div>
+
+                        {!hasEnoughBalance && (
+                          <div className="flex justify-between border-t border-amber-500/20 bg-amber-500/10 -mx-3.5 -mb-3.5 p-3 rounded-b-xl text-amber-300 font-bold">
+                            <span>کسری موجودی جهت خرید:</span>
+                            <span>{deficit.toLocaleString("fa-IR")} تومان</span>
+                          </div>
+                        )}
                       </div>
 
-                      {!hasEnoughBalance && (
-                        <div className="flex justify-between border-t border-amber-500/20 bg-amber-500/10 -mx-3.5 -mb-3.5 p-3 rounded-b-xl text-amber-300 font-bold">
-                          <span>کسری موجودی جهت خرید:</span>
-                          <span>{deficit.toLocaleString("fa-IR")} تومان</span>
+                      {/* Promo / Discount Code Input */}
+                      <div className="rounded-xl border border-white/[0.08] bg-[#080b10] p-3 space-y-2">
+                        <label className="text-[11px] font-medium text-slate-400 block">
+                          کد تخفیف دارید؟
+                        </label>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            dir="ltr"
+                            placeholder="WELCOME / NEXUS20"
+                            value={discountInput}
+                            onChange={(e) => setDiscountInput(e.target.value.toUpperCase())}
+                            className="flex-1 rounded-lg border border-white/10 bg-[#0c1017] px-3 py-1.5 font-mono text-xs text-white placeholder-slate-600 focus:border-sky-500 focus:outline-none uppercase"
+                          />
+                          {appliedDiscount ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAppliedDiscount(null);
+                                setDiscountInput("");
+                                toast.info("کد تخفیف حذف شد");
+                              }}
+                              className="btn-press rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-xs font-semibold text-rose-300 hover:bg-rose-500/20"
+                            >
+                              حذف کد
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={handleApplyDiscount}
+                              disabled={validatingDiscount || !discountInput.trim()}
+                              className="btn-press rounded-lg border border-sky-500/30 bg-sky-500/15 px-3.5 py-1.5 text-xs font-bold text-sky-300 hover:bg-sky-500/25 disabled:opacity-40"
+                            >
+                              {validatingDiscount ? "بررسی..." : "اعمال کد"}
+                            </button>
+                          )}
                         </div>
-                      )}
-                    </div>
+                      </div>
+                    </>
                   )}
 
                   {selectedProduct.fulfillment_type === "MANUAL_ACTIVATION" && !isOutOfStock && (

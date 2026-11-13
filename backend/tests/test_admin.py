@@ -92,3 +92,43 @@ async def test_admin_endpoints_and_settings():
             del_resp = await client.delete(f"/api/v1/admin/products/{new_prod_id}", headers=headers)
             assert del_resp.status_code == 200
             assert del_resp.json()["success"] is True
+
+            # 6. Discount Codes Admin CRUD & Validation Cap
+            disc_code = f"PROMO{int(time.time() * 1000) % 10000}"
+            create_disc = await client.post("/api/v1/discounts/", headers=headers, json={
+                "code": disc_code,
+                "discount_type": "PERCENT",
+                "value": 50,
+                "max_amount_toman": 150000,
+                "min_order_toman": 200000,
+                "usage_limit": 10,
+                "is_active": True,
+            })
+            assert create_disc.status_code == 201
+            disc_id = create_disc.json()["id"]
+
+            # Validate cap (50% of 1,000,000 = 500,000, capped at 150,000)
+            val_disc = await client.post("/api/v1/discounts/validate", headers=headers, json={
+                "code": disc_code,
+                "order_amount_toman": 1_000_000,
+            })
+            assert val_disc.status_code == 200
+            assert val_disc.json()["valid"] is True
+            assert val_disc.json()["discount_toman"] == 150_000
+            assert val_disc.json()["final_amount_toman"] == 850_000
+
+            # Toggle off and verify validation rejects
+            tog_disc = await client.patch(f"/api/v1/discounts/{disc_id}/toggle", headers=headers)
+            assert tog_disc.status_code == 200
+            assert tog_disc.json()["is_active"] is False
+
+            val_off = await client.post("/api/v1/discounts/validate", headers=headers, json={
+                "code": disc_code,
+                "order_amount_toman": 1_000_000,
+            })
+            assert val_off.status_code == 200
+            assert val_off.json()["valid"] is False
+
+            # Delete discount code
+            del_disc = await client.delete(f"/api/v1/discounts/{disc_id}", headers=headers)
+            assert del_disc.status_code == 204

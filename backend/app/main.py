@@ -22,6 +22,9 @@ async def lifespan(app: FastAPI):
         "ALTER TABLE users ADD COLUMN telegram_username VARCHAR(100)",
         "ALTER TABLE payment_requests ADD COLUMN product_id INTEGER",
         "ALTER TABLE payment_requests ADD COLUMN target_email VARCHAR(255)",
+        "ALTER TABLE payment_requests ADD COLUMN discount_code VARCHAR(50)",
+        "ALTER TABLE orders ADD COLUMN discount_toman BIGINT DEFAULT 0",
+        "ALTER TABLE orders ADD COLUMN discount_code VARCHAR(50)",
     ]:
         try:
             async with engine.begin() as conn:
@@ -160,6 +163,32 @@ async def lifespan(app: FastAPI):
                                 status="AVAILABLE",
                             )
                         )
+            await session.commit()
+
+        # Seed initial discount promo codes if empty
+        from app.models.discount import DiscountCode, DiscountType
+        existing_codes = await session.execute(select(DiscountCode))
+        if not existing_codes.scalars().first():
+            seed_codes = [
+                DiscountCode(
+                    code="WELCOME",
+                    discount_type=DiscountType.FIXED,
+                    value=50_000,
+                    min_order_toman=200_000,
+                    usage_limit=1000,
+                    is_active=True,
+                ),
+                DiscountCode(
+                    code="NEXUS20",
+                    discount_type=DiscountType.PERCENT,
+                    value=20,
+                    max_amount_toman=300_000,
+                    min_order_toman=300_000,
+                    usage_limit=500,
+                    is_active=True,
+                ),
+            ]
+            session.add_all(seed_codes)
             await session.commit()
 
     yield
