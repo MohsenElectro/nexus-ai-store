@@ -7,10 +7,12 @@ import "./globals.css";
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
   viewportFit: "cover",
-  themeColor: "#09090b",
+  interactiveWidget: "resizes-content",
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: "#0c1017" },
+    { media: "(prefers-color-scheme: light)", color: "#0c1017" },
+  ],
 };
 
 export const metadata: Metadata = {

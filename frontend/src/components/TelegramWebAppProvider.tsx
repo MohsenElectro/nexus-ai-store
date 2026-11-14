@@ -41,10 +41,10 @@ export default function TelegramWebAppProvider() {
         tg.ready();
         tg.expand();
         if (typeof tg.setHeaderColor === "function") {
-          tg.setHeaderColor("#09090b");
+          tg.setHeaderColor("#0c1017");
         }
         if (typeof tg.setBackgroundColor === "function") {
-          tg.setBackgroundColor("#09090b");
+          tg.setBackgroundColor("#090a0f");
         }
         if (typeof tg.enableClosingConfirmation === "function") {
           tg.enableClosingConfirmation();

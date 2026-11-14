@@ -16,7 +16,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import ReactDropsAiOrb from "./ReactDropsAiOrb";
-import { Product } from "@/lib/api";
+import { Product, getApiBase } from "@/lib/api";
 
 interface ModernHeroProps {
   products: Product[];
@@ -266,12 +266,12 @@ export default function ModernHero({
 
         {/* Tab 2: API & Code Hub */}
         {activeHeroTab === "API" && (
-          <div className="grid gap-6 pt-4 md:grid-cols-2 items-center">
-            <div className="space-y-3 p-2">
-              <span className="rounded-md bg-sky-500/10 px-2.5 py-1 text-xs text-sky-400 font-semibold border border-sky-500/20">
+          <div className="grid gap-4 sm:gap-6 pt-4 md:grid-cols-2 items-center min-w-0">
+            <div className="space-y-3 p-1 sm:p-2 min-w-0">
+              <span className="inline-block rounded-md bg-sky-500/10 px-2.5 py-1 text-xs text-sky-400 font-semibold border border-sky-500/20">
                 یک API Key برای تمام مدل‌ها
               </span>
-              <h3 className="text-lg font-bold text-white">
+              <h3 className="text-base sm:text-lg font-bold text-white">
                 اتصال مستقیم به Claude 3.5, GPT-4o و Gemini Flash
               </h3>
               <p className="text-xs text-slate-400 leading-relaxed">
@@ -286,16 +286,16 @@ export default function ModernHero({
               </button>
             </div>
 
-            <div className="rounded-xl border border-white/[0.08] bg-[#080a0e] p-4 font-mono text-xs text-slate-300" dir="ltr">
+            <div className="min-w-0 w-full overflow-hidden rounded-xl border border-white/[0.08] bg-[#080a0e] p-3.5 sm:p-4 font-mono text-[11px] sm:text-xs text-slate-300" dir="ltr">
               <div className="text-slate-500 text-[11px] pb-2 border-b border-white/[0.06] mb-2 flex justify-between">
                 <span>main.py</span>
                 <span>OpenAI Compatible</span>
               </div>
-              <pre className="text-emerald-400">{`from openai import OpenAI
+              <pre className="text-emerald-400 whitespace-pre-wrap [overflow-wrap:anywhere] text-left leading-relaxed">{`from openai import OpenAI
 
 client = OpenAI(
   api_key="sk-live-your-nexus-key",
-  base_url="http://nexus-ai.store/v1"
+  base_url="${getApiBase().replace(/\/api\/v1\/?$/, "/v1")}"
 )
 
 response = client.chat.completions.create(

@@ -52,7 +52,43 @@ export default function ComparisonMatrix() {
         </p>
       </div>
 
-      <div className="overflow-x-auto rounded-2xl border border-white/[0.08] bg-[#0c1017] shadow-xl">
+      {/* Mobile & Mini-App Stacked Comparison Cards */}
+      <div className="space-y-3 md:hidden">
+        {rows.map((r, idx) => (
+          <div
+            key={`mobile-comp-${idx}`}
+            className="rounded-2xl border border-white/[0.08] bg-[#0c1017] p-4 space-y-2.5 shadow-lg"
+          >
+            <div className="font-bold text-white text-xs border-b border-white/[0.06] pb-2">
+              {r.feature}
+            </div>
+            <div className="flex items-start gap-2 rounded-xl border border-sky-500/20 bg-sky-500/5 p-2.5 text-xs font-semibold text-emerald-400">
+              <Check className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
+              <div>
+                <span className="block text-[10px] font-bold text-sky-400 mb-0.5">AI Nexus Store:</span>
+                <span>{r.nexus}</span>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 gap-1.5 text-[11px] text-slate-400 pt-0.5">
+              <div className="flex items-start gap-1.5">
+                <X className="h-3.5 w-3.5 text-rose-500 shrink-0 mt-0.5" />
+                <span>
+                  <strong className="text-slate-500">کانال‌های تلگرامی:</strong> {r.telegram}
+                </span>
+              </div>
+              <div className="flex items-start gap-1.5 text-slate-500">
+                <span className="inline-block w-3.5 text-center shrink-0">•</span>
+                <span>
+                  <strong>خرید مستقیم خارجی:</strong> {r.direct}
+                </span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Desktop Comparison Table */}
+      <div className="hidden md:block overflow-x-auto rounded-2xl border border-white/[0.08] bg-[#0c1017] shadow-xl">
         <table className="w-full text-right text-xs">
           <thead>
             <tr className="border-b border-white/[0.08] bg-slate-900/60 text-slate-400">

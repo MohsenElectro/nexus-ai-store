@@ -385,20 +385,25 @@ export default function Home() {
 
         {/* Navigation Sub-Bar (Mobile and Telegram Desktop < lg) */}
         <div className="border-t border-white/5 bg-[#0a0d14] lg:hidden">
-          <div className="mx-auto flex max-w-7xl items-center justify-around sm:justify-center sm:gap-2 overflow-x-auto no-scrollbar px-2 py-1.5">
+          <div
+            className={`mx-auto max-w-7xl grid ${
+              isAdmin ? "grid-cols-4" : "grid-cols-3"
+            } gap-1 sm:flex sm:items-center sm:justify-center sm:gap-2 px-2 py-1.5`}
+          >
             <button
               onClick={() => handleTabChange("STORE")}
-              className={`shrink-0 rounded-lg px-3 py-1 text-xs font-semibold transition-all btn-press ${
+              className={`truncate rounded-lg px-1.5 sm:px-3 py-1.5 text-[11px] sm:text-xs font-semibold transition-all btn-press ${
                 activeTab === "STORE"
                   ? "bg-white text-slate-950 font-bold shadow-sm"
                   : "text-slate-400 hover:text-white"
               }`}
             >
-              🛍 فروشگاه و آفرها
+              <span className="sm:hidden">🛍 فروشگاه</span>
+              <span className="hidden sm:inline">🛍 فروشگاه و آفرها</span>
             </button>
             <button
               onClick={() => handleTabChange("DEVELOPER")}
-              className={`shrink-0 rounded-lg px-3 py-1 text-xs font-semibold transition-all btn-press ${
+              className={`truncate rounded-lg px-1.5 sm:px-3 py-1.5 text-[11px] sm:text-xs font-semibold transition-all btn-press ${
                 activeTab === "DEVELOPER"
                   ? "bg-white text-slate-950 font-bold shadow-sm"
                   : "text-slate-400 hover:text-white"
@@ -408,7 +413,7 @@ export default function Home() {
             </button>
             <button
               onClick={() => handleTabChange("ORDERS")}
-              className={`shrink-0 rounded-lg px-3 py-1 text-xs font-semibold transition-all btn-press ${
+              className={`truncate rounded-lg px-1.5 sm:px-3 py-1.5 text-[11px] sm:text-xs font-semibold transition-all btn-press ${
                 activeTab === "ORDERS"
                   ? "bg-white text-slate-950 font-bold shadow-sm"
                   : "text-slate-400 hover:text-white"
@@ -419,13 +424,14 @@ export default function Home() {
             {isAdmin && (
               <button
                 onClick={() => handleTabChange("ADMIN")}
-                className={`shrink-0 rounded-lg px-3 py-1 text-xs font-semibold transition-all btn-press ${
+                className={`truncate rounded-lg px-1.5 sm:px-3 py-1.5 text-[11px] sm:text-xs font-semibold transition-all btn-press ${
                   activeTab === "ADMIN"
                     ? "border border-amber-500/40 bg-amber-500/20 text-amber-300 font-bold"
                     : "text-amber-400/80 hover:text-amber-300"
                 }`}
               >
-                👑 انبار و ادمین
+                <span className="sm:hidden">👑 ادمین</span>
+                <span className="hidden sm:inline">👑 انبار و ادمین</span>
               </button>
             )}
           </div>
@@ -433,7 +439,7 @@ export default function Home() {
       </header>
 
       {/* Main Container */}
-      <main className="mx-auto max-w-7xl px-4 pt-6 sm:px-6">
+      <main className="mx-auto w-full max-w-7xl overflow-x-clip px-3 pt-4 sm:px-6 sm:pt-6">
         {/* Live Marquee Ticker */}
         <LiveTicker />
 
@@ -506,18 +512,18 @@ export default function Home() {
 
         {/* 3. Orders Tab */}
         {activeTab === "ORDERS" && (
-          <div className="rounded-2xl border border-white/[0.08] bg-[#0c1017] p-6 sm:p-8">
-            <h2 className="text-xl font-bold text-white">
+          <div className="min-w-0 rounded-2xl border border-white/[0.08] bg-[#0c1017] p-4 sm:p-8">
+            <h2 className="text-lg sm:text-xl font-bold text-white">
               تاریخچه خریدهای من و اطلاعات لایسنس
             </h2>
             {orders.length === 0 ? (
               <p className="mt-4 text-xs text-slate-500">هنوز سفارشی ثبت نکرده‌اید.</p>
             ) : (
-              <div className="mt-6 space-y-4">
+              <div className="mt-5 sm:mt-6 space-y-4 min-w-0">
                 {orders.map((ord, ordIdx) => (
                   <div
                     key={`my-order-${ord.id}-${ordIdx}`}
-                    className="rounded-xl border border-white/[0.06] bg-[#080b10] p-4"
+                    className="min-w-0 rounded-xl border border-white/[0.06] bg-[#080b10] p-3.5 sm:p-4"
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/[0.06] pb-3">
                       <div>
@@ -537,18 +543,34 @@ export default function Home() {
                       </span>
                     </div>
 
-                    <div className="mt-3">
+                    <div className="mt-3 min-w-0">
                       {ord.items.map((it, itIdx) => (
-                        <div key={`order-item-${it.id}-${itIdx}`}>
+                        <div key={`order-item-${it.id}-${itIdx}`} className="min-w-0">
                           <div className="text-xs text-slate-400">
                             مبلغ پرداختی: {it.unit_price_toman.toLocaleString("fa-IR")} تومان
                           </div>
                           {it.delivered_data && (
-                            <div className="mt-2.5 rounded-lg border border-sky-500/20 bg-sky-950/20 p-3">
-                              <span className="text-[10px] font-semibold uppercase tracking-wider text-sky-400">
-                                اطلاعات اختصاصی اکانت / لایسنس شما (رمزنگاری AES-256):
-                              </span>
-                              <pre className="mt-1 font-mono text-xs text-white whitespace-pre-wrap select-all">
+                            <div className="mt-2.5 min-w-0 rounded-lg border border-sky-500/20 bg-sky-950/20 p-3">
+                              <div className="flex items-center justify-between gap-2 mb-1.5">
+                                <span className="text-[10px] font-semibold uppercase tracking-wider text-sky-400">
+                                  اطلاعات اختصاصی اکانت / لایسنس شما (AES-256):
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(it.delivered_data || "");
+                                    toast.success("اطلاعات اکانت کپی شد");
+                                  }}
+                                  className="btn-press shrink-0 flex items-center gap-1 rounded-md border border-sky-500/30 bg-sky-500/15 px-2 py-0.5 text-[10px] font-semibold text-sky-300 hover:bg-sky-500/25"
+                                >
+                                  <Copy className="h-3 w-3" />
+                                  <span>کپی</span>
+                                </button>
+                              </div>
+                              <pre
+                                dir="ltr"
+                                className="font-mono text-xs text-white whitespace-pre-wrap [overflow-wrap:anywhere] text-left select-all rounded-md bg-black/40 p-2.5 border border-white/5"
+                              >
                                 {it.delivered_data}
                               </pre>
                             </div>
@@ -597,8 +619,8 @@ export default function Home() {
 
       {/* Wallet Topup Modal */}
       {showWalletModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#0c1017] p-6 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 p-2 sm:p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md max-h-[90dvh] overflow-y-auto overscroll-contain rounded-2xl border border-white/10 bg-[#0c1017] p-4 sm:p-6 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] shadow-2xl">
             <h3 className="text-base font-bold text-white">افزایش موجودی کیف پول</h3>
             <p className="mt-1 text-xs text-slate-400">
               موجودی فعلی: {wallet ? wallet.balance_toman.toLocaleString("fa-IR") : "۰"} تومان
@@ -711,8 +733,8 @@ export default function Home() {
         const deficit = Math.max(0, prodPrice - currentBal);
 
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
-            <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#0c1017] p-6 shadow-2xl">
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 p-2 sm:p-4 backdrop-blur-sm">
+            <div className="w-full max-w-md max-h-[90dvh] overflow-y-auto overscroll-contain rounded-2xl border border-white/10 bg-[#0c1017] p-4 sm:p-6 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] shadow-2xl">
               <h3 className="text-base font-bold text-white">تایید خرید: {selectedProduct.title}</h3>
 
               {!orderResult ? (
@@ -888,9 +910,27 @@ export default function Home() {
                   </div>
 
                   {orderResult.items?.[0]?.delivered_data && (
-                    <div className="rounded-xl border border-sky-500/20 bg-sky-950/20 p-4">
-                      <span className="text-[11px] font-semibold text-sky-400">اطلاعات اکانت تحویل داده شده (رمزنگاری‌شده):</span>
-                      <pre className="mt-2 font-mono text-xs text-white select-all whitespace-pre-wrap p-3 rounded-lg bg-black/40 border border-white/5">
+                    <div className="min-w-0 rounded-xl border border-sky-500/20 bg-sky-950/20 p-3.5 sm:p-4">
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <span className="text-[11px] font-semibold text-sky-400">
+                          اطلاعات اکانت تحویل داده شده (رمزنگاری‌شده):
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(orderResult.items[0].delivered_data || "");
+                            toast.success("اطلاعات اکانت کپی شد");
+                          }}
+                          className="btn-press shrink-0 flex items-center gap-1 rounded-md border border-sky-500/30 bg-sky-500/15 px-2 py-1 text-[10px] font-semibold text-sky-300 hover:bg-sky-500/25"
+                        >
+                          <Copy className="h-3 w-3" />
+                          <span>کپی</span>
+                        </button>
+                      </div>
+                      <pre
+                        dir="ltr"
+                        className="font-mono text-xs text-white select-all whitespace-pre-wrap [overflow-wrap:anywhere] text-left p-3 rounded-lg bg-black/40 border border-white/5"
+                      >
                         {orderResult.items[0].delivered_data}
                       </pre>
                     </div>

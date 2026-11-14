@@ -336,50 +336,50 @@ export default function AdminDashboard({ products, onRefreshProducts }: AdminDas
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-8 min-w-0">
       {/* Top Banner & KPI Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-xl border border-white/[0.08] bg-[#0c1017] p-5 shadow-lg">
-          <div className="flex items-center justify-between text-slate-400 text-xs">
-            <span>درآمد کل فروشگاه</span>
-            <TrendingUp className="h-4 w-4 text-emerald-400" />
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 min-w-0">
+        <div className="min-w-0 rounded-xl border border-white/[0.08] bg-[#0c1017] p-3.5 sm:p-5 shadow-lg">
+          <div className="flex items-center justify-between gap-1 text-slate-400 text-[11px] sm:text-xs">
+            <span className="truncate">درآمد کل فروشگاه</span>
+            <TrendingUp className="h-4 w-4 text-emerald-400 shrink-0" />
           </div>
-          <div className="mt-2 text-2xl font-black text-white">
+          <div className="mt-2 text-lg sm:text-2xl font-black text-white truncate">
             {stats ? stats.total_revenue_toman.toLocaleString("fa-IR") : "۰"}
-            <span className="mr-1 text-xs font-normal text-slate-500">تومان</span>
+            <span className="mr-1 text-[10px] sm:text-xs font-normal text-slate-500">تومان</span>
           </div>
         </div>
 
-        <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-5 shadow-lg">
-          <div className="flex items-center justify-between text-amber-300 text-xs">
-            <span>صف شارژ دستی (کارت ارزی)</span>
-            <AlertTriangle className="h-4 w-4 text-amber-400" />
+        <div className="min-w-0 rounded-xl border border-amber-500/20 bg-amber-500/10 p-3.5 sm:p-5 shadow-lg">
+          <div className="flex items-center justify-between gap-1 text-amber-300 text-[11px] sm:text-xs">
+            <span className="truncate">صف شارژ دستی</span>
+            <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0" />
           </div>
-          <div className="mt-2 text-2xl font-black text-white">
+          <div className="mt-2 text-lg sm:text-2xl font-black text-white truncate">
             {stats ? stats.pending_manual_count : 0}
-            <span className="mr-1 text-xs font-normal text-amber-300">سفارش منتظر اقدام</span>
+            <span className="mr-1 text-[10px] sm:text-xs font-normal text-amber-300">منتظر اقدام</span>
           </div>
         </div>
 
-        <div className="rounded-xl border border-white/[0.08] bg-[#0c1017] p-5 shadow-lg">
-          <div className="flex items-center justify-between text-slate-400 text-xs">
-            <span>موجودی آماده در انبارها (Vault)</span>
-            <Database className="h-4 w-4 text-sky-400" />
+        <div className="min-w-0 rounded-xl border border-white/[0.08] bg-[#0c1017] p-3.5 sm:p-5 shadow-lg">
+          <div className="flex items-center justify-between gap-1 text-slate-400 text-[11px] sm:text-xs">
+            <span className="truncate">موجودی انبار (Vault)</span>
+            <Database className="h-4 w-4 text-sky-400 shrink-0" />
           </div>
-          <div className="mt-2 text-2xl font-black text-white">
+          <div className="mt-2 text-lg sm:text-2xl font-black text-white truncate">
             {stats ? stats.total_vault_items_available : 0}
-            <span className="mr-1 text-xs font-normal text-slate-500">لایسنس رمزنگاری‌شده</span>
+            <span className="mr-1 text-[10px] sm:text-xs font-normal text-slate-500">لایسنس</span>
           </div>
         </div>
 
-        <div className="rounded-xl border border-white/[0.08] bg-[#0c1017] p-5 shadow-lg">
-          <div className="flex items-center justify-between text-slate-400 text-xs">
-            <span>کلیدهای API فعال و کاربران</span>
-            <UserCheck className="h-4 w-4 text-sky-400" />
+        <div className="min-w-0 rounded-xl border border-white/[0.08] bg-[#0c1017] p-3.5 sm:p-5 shadow-lg">
+          <div className="flex items-center justify-between gap-1 text-slate-400 text-[11px] sm:text-xs">
+            <span className="truncate">کلیدهای API فعال</span>
+            <UserCheck className="h-4 w-4 text-sky-400 shrink-0" />
           </div>
-          <div className="mt-2 text-2xl font-black text-white">
+          <div className="mt-2 text-lg sm:text-2xl font-black text-white truncate">
             {stats ? stats.active_api_keys_count : 0}
-            <span className="mr-1 text-xs font-normal text-slate-500">کلید توکن</span>
+            <span className="mr-1 text-[10px] sm:text-xs font-normal text-slate-500">کلید توکن</span>
           </div>
         </div>
       </div>
@@ -726,16 +726,16 @@ export default function AdminDashboard({ products, onRefreshProducts }: AdminDas
                 return (
                   <div
                     key={`admin-product-${p.id}-${pIdx}`}
-                    className="rounded-xl border border-white/[0.06] bg-[#080b10] p-4 flex flex-col md:flex-row md:items-center justify-between gap-4"
+                    className="min-w-0 rounded-xl border border-white/[0.06] bg-[#080b10] p-3.5 sm:p-4 flex flex-col md:flex-row md:items-center justify-between gap-4"
                   >
-                    <div>
-                      <h4 className="font-bold text-white text-sm">{p.title}</h4>
+                    <div className="min-w-0">
+                      <h4 className="font-bold text-white text-sm truncate">{p.title}</h4>
                       <span className="text-[11px] text-slate-500">
                         دسته: {p.category} | روش تحویل: {p.fulfillment_type} | موجودی: {p.inventory_count}
                       </span>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-3">
+                    <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-end gap-2.5 sm:gap-3">
                       <div>
                         <label className="block text-[10px] text-slate-400 mb-1">قیمت (تومان):</label>
                         <input
@@ -747,7 +747,7 @@ export default function AdminDashboard({ products, onRefreshProducts }: AdminDas
                               [p.id]: { ...edit, price_toman: Number(e.target.value) },
                             })
                           }
-                          className="w-36 rounded-xl border border-white/10 bg-[#0c1017] px-2.5 py-1.5 text-xs text-white focus:border-sky-500 focus:outline-none"
+                          className="w-full sm:w-36 rounded-xl border border-white/10 bg-[#0c1017] px-2.5 py-1.5 text-xs text-white focus:border-sky-500 focus:outline-none"
                         />
                       </div>
 
@@ -763,14 +763,14 @@ export default function AdminDashboard({ products, onRefreshProducts }: AdminDas
                               [p.id]: { ...edit, offer_badge: e.target.value },
                             })
                           }
-                          className="w-36 rounded-xl border border-white/10 bg-[#0c1017] px-2.5 py-1.5 text-xs text-white focus:border-sky-500 focus:outline-none"
+                          className="w-full sm:w-36 rounded-xl border border-white/10 bg-[#0c1017] px-2.5 py-1.5 text-xs text-white focus:border-sky-500 focus:outline-none"
                         />
                       </div>
 
-                      <div className="pt-4 flex items-center gap-2">
+                      <div className="col-span-2 sm:col-span-1 pt-1 sm:pt-4 flex items-center gap-2">
                         <button
                           onClick={() => handleSaveProduct(p.id)}
-                          className="btn-press flex items-center gap-1.5 rounded-xl bg-white px-4 py-1.5 text-xs font-bold text-slate-950 hover:bg-slate-200"
+                          className="btn-press flex-1 sm:flex-initial flex items-center justify-center gap-1.5 rounded-xl bg-white px-4 py-1.5 text-xs font-bold text-slate-950 hover:bg-slate-200"
                         >
                           {savedProductId === p.id ? <Check className="h-4 w-4" /> : <Save className="h-4 w-4 text-slate-800" />}
                           ذخیره
@@ -831,7 +831,7 @@ export default function AdminDashboard({ products, onRefreshProducts }: AdminDas
 
             {/* Bot Message Bubble */}
             <div
-              className="rounded-2xl rounded-tr-sm border border-white/[0.08] bg-[#111824] p-4 text-xs leading-relaxed text-slate-200 whitespace-pre-line"
+              className="min-w-0 rounded-2xl rounded-tr-sm border border-white/[0.08] bg-[#111824] p-3.5 sm:p-4 text-xs leading-relaxed text-slate-200 whitespace-pre-line [overflow-wrap:anywhere]"
               dangerouslySetInnerHTML={{
                 __html: tgMessage || "در حال بارگذاری منوی ربات تلگرام...",
               }}

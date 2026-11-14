@@ -77,12 +77,12 @@ export default function BentoProductGrid({ products, onSelectProduct }: BentoPro
       </div>
 
       {/* Category Pills Bar */}
-      <div className="my-6 flex flex-wrap gap-2">
+      <div className="my-5 sm:my-6 flex gap-2 overflow-x-auto no-scrollbar pb-1 sm:flex-wrap">
         {categories.map((c) => (
           <button
             key={c.id}
             onClick={() => setSelectedCategory(c.id)}
-            className={`btn-press flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-all ${
+            className={`btn-press shrink-0 flex items-center gap-2 rounded-xl px-3.5 sm:px-4 py-2 text-xs font-semibold transition-all ${
               selectedCategory === c.id
                 ? "bg-white text-slate-950 font-bold shadow-md shadow-white/5"
                 : "border border-white/[0.08] bg-[#0c1017] text-slate-400 hover:border-white/20 hover:text-white"
