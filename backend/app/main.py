@@ -192,6 +192,7 @@ async def lifespan(app: FastAPI):
             await session.commit()
 
         # Sync any database-promoted Telegram admins into runtime ADMIN_TELEGRAM_IDS
+        from app.models.user import User, UserRole
         admin_users_res = await session.execute(
             select(User).where(User.role == UserRole.ADMIN, User.telegram_id.isnot(None))
         )
