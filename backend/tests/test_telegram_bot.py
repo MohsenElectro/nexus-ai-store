@@ -309,6 +309,31 @@ async def test_telegram_admin_features():
             assert del_adm_resp.status_code == 200
             assert "با موفقیت حذف شد" in del_adm_resp.json()["text"]
 
+            # Test adding admin by @username even before they start the bot
+            add_uname_resp = await client.post(
+                "/api/v1/telegram/simulate",
+                json={
+                    "telegram_id": admin_id,
+                    "text": "/addadmin @salehkheiri1374",
+                },
+            )
+            assert add_uname_resp.status_code == 200
+            assert "ادمین جدید با موفقیت اضافه شد" in add_uname_resp.json()["text"]
+            assert "@salehkheiri1374" in add_uname_resp.json()["text"]
+
+            # Verify @salehkheiri1374 gets admin access on first interaction
+            saleh_start_resp = await client.post(
+                "/api/v1/telegram/simulate",
+                json={
+                    "telegram_id": 888999111,
+                    "username": "salehkheiri1374",
+                    "first_name": "Saleh",
+                    "text": "/start",
+                },
+            )
+            assert saleh_start_resp.status_code == 200
+            assert "مدیر سیستم" in saleh_start_resp.json()["text"]
+
             # 6. Non-admin trying /admin -> gets rejected
             forbidden_resp = await client.post(
                 "/api/v1/telegram/simulate",

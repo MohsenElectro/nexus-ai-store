@@ -56,6 +56,7 @@ class Settings(BaseSettings):
     TELEGRAM_WEBHOOK_SECRET: str = "ai-nexus-tg-secret-token"
     FRONTEND_URL: str = "http://localhost:3000"
     ADMIN_TELEGRAM_IDS: List[str] = ["65807806"]
+    ADMIN_TELEGRAM_USERNAMES: List[str] = ["salehkheiri1374"]
 
     # Upstream AI Configuration
     UPSTREAM_OPENAI_BASE: str = "https://api.openai.com/v1"

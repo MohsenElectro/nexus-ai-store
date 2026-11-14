@@ -61,9 +61,23 @@ class TelegramBotService:
         last_name = tg_user.get("last_name", "")
         full_name = f"{first_name} {last_name}".strip() or username or f"کاربر تلگرام {tg_id}"
 
+        from sqlalchemy import func
+
         res = await db.execute(select(User).where(User.telegram_id == tg_id))
         user = res.scalar_one_or_none()
-        is_admin_id = tg_id in getattr(settings, "ADMIN_TELEGRAM_IDS", [])
+        if not user and username:
+            res_u = await db.execute(
+                select(User).where(func.lower(User.telegram_username) == username.lower())
+            )
+            user = res_u.scalar_one_or_none()
+
+        admin_usernames = [
+            u.lower().lstrip("@") for u in getattr(settings, "ADMIN_TELEGRAM_USERNAMES", [])
+        ]
+        is_admin_id = (
+            tg_id in getattr(settings, "ADMIN_TELEGRAM_IDS", [])
+            or (bool(username) and username.lower().lstrip("@") in admin_usernames)
+        )
 
         if not user:
             user = User(
@@ -79,9 +93,14 @@ class TelegramBotService:
             await db.refresh(user)
         else:
             updated = False
+            if user.telegram_id != tg_id:
+                user.telegram_id = tg_id
+                updated = True
             if is_admin_id and user.role != UserRole.ADMIN:
                 user.role = UserRole.ADMIN
                 updated = True
+            if user.role == UserRole.ADMIN and tg_id not in getattr(settings, "ADMIN_TELEGRAM_IDS", []):
+                settings.ADMIN_TELEGRAM_IDS.append(tg_id)
             if username and user.telegram_username != username:
                 user.telegram_username = username
                 updated = True
@@ -89,6 +108,7 @@ class TelegramBotService:
                 not user.full_name
                 or user.full_name.startswith("کاربر تلگرام ")
                 or user.full_name.startswith("ادمین تلگرام ")
+                or user.full_name.startswith("ادمین @")
             ):
                 user.full_name = full_name
                 updated = True
@@ -979,25 +999,14 @@ class TelegramBotService:
 
         # Resolve target user by @username or numeric telegram_id
         target_user: Optional[User] = None
+        clean_uname: Optional[str] = None
         if target_raw.startswith("@") or not target_raw.lstrip("-").isdigit():
             clean_uname = target_raw.lstrip("@").strip()
             res = await db.execute(
                 select(User).where(func.lower(User.telegram_username) == clean_uname.lower())
             )
             target_user = res.scalar_one_or_none()
-            if not target_user:
-                return {
-                    "text": (
-                        f"⚠️ کاربری با یوزرنیم <code>@{html.escape(clean_uname)}</code> در دیتابیس یافت نشد.\n\n"
-                        "لطفاً یا از ایشان بخواهید ابتدا یک‌بار در ربات <code>/start</code> بزند، "
-                        "یا آیدی عددی تلگرام ایشان را وارد کنید:\n"
-                        "<code>/addadmin 123456789</code>"
-                    ),
-                    "reply_markup": {
-                        "inline_keyboard": [[{"text": "👥 مدیریت ادمین‌ها", "callback_data": "adm:admins"}]]
-                    },
-                }
-            target_tg_id = str(target_user.telegram_id)
+            target_tg_id = str(target_user.telegram_id) if (target_user and target_user.telegram_id) else ""
         else:
             target_tg_id = target_raw
             res = await db.execute(select(User).where(User.telegram_id == target_tg_id))
@@ -1017,11 +1026,16 @@ class TelegramBotService:
                 await db.commit()
             if hasattr(settings, "ADMIN_TELEGRAM_IDS") and target_tg_id in settings.ADMIN_TELEGRAM_IDS:
                 settings.ADMIN_TELEGRAM_IDS.remove(target_tg_id)
+            if clean_uname and hasattr(settings, "ADMIN_TELEGRAM_USERNAMES"):
+                settings.ADMIN_TELEGRAM_USERNAMES = [
+                    u for u in settings.ADMIN_TELEGRAM_USERNAMES if u.lower().lstrip("@") != clean_uname.lower()
+                ]
 
             admins_str = await _format_admins_list()
+            label_removed = f"@{clean_uname}" if clean_uname else target_tg_id
             return {
                 "text": (
-                    f"✅ دسترسی ادمین برای کاربر <code>{html.escape(target_tg_id)}</code> با موفقیت حذف شد.\n\n"
+                    f"✅ دسترسی ادمین برای کاربر <code>{html.escape(label_removed)}</code> با موفقیت حذف شد.\n\n"
                     f"👑 <b>لیست ادمین‌های فعلی:</b>\n{admins_str}"
                 ),
                 "reply_markup": {
@@ -1029,11 +1043,12 @@ class TelegramBotService:
                 },
             }
 
-        # Handle add / promote admin
+        # Handle add / promote admin (supports both numeric ID and @username even before /start!)
         if not target_user:
             target_user = User(
-                telegram_id=target_tg_id,
-                full_name=f"ادمین تلگرام {target_tg_id}",
+                telegram_id=target_tg_id or None,
+                telegram_username=clean_uname,
+                full_name=f"ادمین @{clean_uname}" if clean_uname else f"ادمین تلگرام {target_tg_id}",
                 hashed_password=get_password_hash(secrets.token_urlsafe(16)),
                 role=UserRole.ADMIN,
                 is_active=True,
@@ -1044,18 +1059,25 @@ class TelegramBotService:
             await wallet_service.get_or_create_wallet(db, target_user.id)
         else:
             target_user.role = UserRole.ADMIN
+            if clean_uname and not target_user.telegram_username:
+                target_user.telegram_username = clean_uname
             await db.commit()
             await db.refresh(target_user)
 
         if target_tg_id and target_tg_id not in settings.ADMIN_TELEGRAM_IDS:
             settings.ADMIN_TELEGRAM_IDS.append(target_tg_id)
+        if clean_uname and hasattr(settings, "ADMIN_TELEGRAM_USERNAMES"):
+            existing_unames = [u.lower().lstrip("@") for u in settings.ADMIN_TELEGRAM_USERNAMES]
+            if clean_uname.lower() not in existing_unames:
+                settings.ADMIN_TELEGRAM_USERNAMES.append(clean_uname)
 
         admins_str = await _format_admins_list()
+        display_target = f"@{clean_uname}" if clean_uname else (target_user.full_name or target_tg_id)
         return {
             "text": (
                 f"🎉 <b>ادمین جدید با موفقیت اضافه شد!</b>\n\n"
-                f"👤 <b>کاربر:</b> {html.escape(target_user.full_name or target_tg_id)}\n"
-                f"🆔 <b>آیدی تلگرام:</b> <code>{html.escape(target_tg_id)}</code>\n"
+                f"👤 <b>کاربر:</b> <code>{html.escape(display_target)}</code>\n"
+                f"🆔 <b>آیدی تلگرام:</b> <code>{html.escape(target_tg_id or 'ثبت خودکار در اولین ورود')}</code>\n"
                 f"🔑 <b>سطح دسترسی:</b> مدیر کامل در ربات و مینی‌اپ\n"
                 "─────────────────\n"
                 f"👑 <b>لیست ادمین‌های فعلی:</b>\n{admins_str}"
