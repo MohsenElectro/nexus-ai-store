@@ -275,7 +275,41 @@ async def test_telegram_admin_features():
             assert "73,000" in rate_upd_resp.json()["text"]
             assert "%25" in rate_upd_resp.json()["text"]
 
-            # 5. Non-admin trying /admin -> gets rejected
+            # 5. Admin adds a new admin via /addadmin and removes them via /deladmin
+            add_adm_resp = await client.post(
+                "/api/v1/telegram/simulate",
+                json={
+                    "telegram_id": admin_id,
+                    "text": "/addadmin 777888999",
+                },
+            )
+            assert add_adm_resp.status_code == 200
+            assert "ادمین جدید با موفقیت اضافه شد" in add_adm_resp.json()["text"]
+            assert "777888999" in add_adm_resp.json()["text"]
+
+            # Verify the newly added admin can now access /admin panel
+            new_adm_check = await client.post(
+                "/api/v1/telegram/simulate",
+                json={
+                    "telegram_id": 777888999,
+                    "text": "/admin",
+                },
+            )
+            assert new_adm_check.status_code == 200
+            assert "پنل مدیریت" in new_adm_check.json()["text"]
+
+            # Remove the temporary admin via /deladmin
+            del_adm_resp = await client.post(
+                "/api/v1/telegram/simulate",
+                json={
+                    "telegram_id": admin_id,
+                    "text": "/deladmin 777888999",
+                },
+            )
+            assert del_adm_resp.status_code == 200
+            assert "با موفقیت حذف شد" in del_adm_resp.json()["text"]
+
+            # 6. Non-admin trying /admin -> gets rejected
             forbidden_resp = await client.post(
                 "/api/v1/telegram/simulate",
                 json={

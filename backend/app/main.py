@@ -191,6 +191,14 @@ async def lifespan(app: FastAPI):
             session.add_all(seed_codes)
             await session.commit()
 
+        # Sync any database-promoted Telegram admins into runtime ADMIN_TELEGRAM_IDS
+        admin_users_res = await session.execute(
+            select(User).where(User.role == UserRole.ADMIN, User.telegram_id.isnot(None))
+        )
+        for adm in admin_users_res.scalars().all():
+            if adm.telegram_id and str(adm.telegram_id) not in settings.ADMIN_TELEGRAM_IDS:
+                settings.ADMIN_TELEGRAM_IDS.append(str(adm.telegram_id))
+
     yield
     await engine.dispose()
 

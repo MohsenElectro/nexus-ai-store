@@ -85,7 +85,11 @@ class TelegramBotService:
             if username and user.telegram_username != username:
                 user.telegram_username = username
                 updated = True
-            if full_name and not user.full_name:
+            if full_name and (
+                not user.full_name
+                or user.full_name.startswith("کاربر تلگرام ")
+                or user.full_name.startswith("ادمین تلگرام ")
+            ):
                 user.full_name = full_name
                 updated = True
             if updated:
@@ -800,6 +804,12 @@ class TelegramBotService:
                 }
             ],
             [
+                {
+                    "text": "👥 مدیریت ادمین‌های ربات (/addadmin)",
+                    "callback_data": "adm:admins",
+                }
+            ],
+            [
                 {"text": "🔄 بروزرسانی آمار", "callback_data": "menu:admin"},
                 {"text": "🏠 منوی اصلی فروشگاه", "callback_data": "menu:main"},
             ],
@@ -898,6 +908,160 @@ class TelegramBotService:
                     [{"text": "👑 پنل مدیریت", "callback_data": "menu:admin"}],
                     [{"text": "🛍 مشاهده فروشگاه", "callback_data": "cat:ALL"}],
                 ]
+            },
+        }
+
+    @classmethod
+    async def handle_admin_manage_command(
+        cls, db: AsyncSession, command_text: str
+    ) -> Dict[str, Any]:
+        from sqlalchemy import func, or_
+
+        parts = command_text.strip().split()
+        cmd = parts[0].lower() if parts else "/admins"
+
+        # Helper to build current admin list
+        async def _format_admins_list() -> str:
+            res = await db.execute(
+                select(User).where(
+                    or_(
+                        User.role == UserRole.ADMIN,
+                        User.telegram_id.in_(getattr(settings, "ADMIN_TELEGRAM_IDS", [])),
+                    )
+                )
+            )
+            admin_users = res.scalars().all()
+            lines = []
+            seen_ids = set()
+            for u in admin_users:
+                if u.telegram_id:
+                    seen_ids.add(str(u.telegram_id))
+                uname = f" (@{html.escape(u.telegram_username)})" if u.telegram_username else ""
+                owner_tag = " [مالک اصلی]" if str(u.telegram_id) == "65807806" else ""
+                lines.append(
+                    f"• <b>{html.escape(u.full_name or 'ادمین')}</b>{uname} — ID: <code>{html.escape(str(u.telegram_id or '-'))}</code>{owner_tag}"
+                )
+            for raw_id in getattr(settings, "ADMIN_TELEGRAM_IDS", []):
+                if str(raw_id) not in seen_ids:
+                    owner_tag = " [مالک اصلی]" if str(raw_id) == "65807806" else ""
+                    lines.append(f"• ادمین سیستم — ID: <code>{html.escape(str(raw_id))}</code>{owner_tag}")
+            return "\n".join(lines) if lines else "هیچ ادمینی ثبت نشده است."
+
+        # Case 1: Show help and current admins list
+        if len(parts) == 1:
+            admins_str = await _format_admins_list()
+            text = (
+                "👥 <b>مدیریت ادمین‌های ربات و مینی‌اپ:</b>\n\n"
+                "👑 <b>لیست ادمین‌های فعلی:</b>\n"
+                f"{admins_str}\n"
+                "─────────────────\n"
+                "➕ <b>افزودن ادمین جدید:</b>\n"
+                "• با آیدی عددی تلگرام (پیشنهادی):\n"
+                "  <code>/addadmin 123456789</code>\n\n"
+                "• با یوزرنیم تلگرام (اگر قبلاً ربات را استارت زده باشد):\n"
+                "  <code>/addadmin @username</code>\n\n"
+                "➖ <b>حذف دسترسی ادمین:</b>\n"
+                "  <code>/deladmin 123456789</code>\n\n"
+                "💡 <i>نکته: هر کاربری می‌تواند با ارسال دستور <code>/id</code> به ربات، آیدی عددی تلگرام خود را ببیند.</i>"
+            )
+            return {
+                "text": text,
+                "reply_markup": {
+                    "inline_keyboard": [
+                        [{"text": "👑 بازگشت به پنل ادمین", "callback_data": "menu:admin"}],
+                        [{"text": "🏠 منوی اصلی", "callback_data": "menu:main"}],
+                    ]
+                },
+            }
+
+        target_raw = parts[1].strip()
+        is_remove = cmd in ("/deladmin", "/removeadmin", "/demote")
+
+        # Resolve target user by @username or numeric telegram_id
+        target_user: Optional[User] = None
+        if target_raw.startswith("@") or not target_raw.lstrip("-").isdigit():
+            clean_uname = target_raw.lstrip("@").strip()
+            res = await db.execute(
+                select(User).where(func.lower(User.telegram_username) == clean_uname.lower())
+            )
+            target_user = res.scalar_one_or_none()
+            if not target_user:
+                return {
+                    "text": (
+                        f"⚠️ کاربری با یوزرنیم <code>@{html.escape(clean_uname)}</code> در دیتابیس یافت نشد.\n\n"
+                        "لطفاً یا از ایشان بخواهید ابتدا یک‌بار در ربات <code>/start</code> بزند، "
+                        "یا آیدی عددی تلگرام ایشان را وارد کنید:\n"
+                        "<code>/addadmin 123456789</code>"
+                    ),
+                    "reply_markup": {
+                        "inline_keyboard": [[{"text": "👥 مدیریت ادمین‌ها", "callback_data": "adm:admins"}]]
+                    },
+                }
+            target_tg_id = str(target_user.telegram_id)
+        else:
+            target_tg_id = target_raw
+            res = await db.execute(select(User).where(User.telegram_id == target_tg_id))
+            target_user = res.scalar_one_or_none()
+
+        # Handle remove / demote admin
+        if is_remove:
+            if target_tg_id == "65807806":
+                return {
+                    "text": "⛔ امکان حذف دسترسی مالک اصلی سیستم وجود ندارد.",
+                    "reply_markup": {
+                        "inline_keyboard": [[{"text": "👥 مدیریت ادمین‌ها", "callback_data": "adm:admins"}]]
+                    },
+                }
+            if target_user:
+                target_user.role = UserRole.CUSTOMER
+                await db.commit()
+            if hasattr(settings, "ADMIN_TELEGRAM_IDS") and target_tg_id in settings.ADMIN_TELEGRAM_IDS:
+                settings.ADMIN_TELEGRAM_IDS.remove(target_tg_id)
+
+            admins_str = await _format_admins_list()
+            return {
+                "text": (
+                    f"✅ دسترسی ادمین برای کاربر <code>{html.escape(target_tg_id)}</code> با موفقیت حذف شد.\n\n"
+                    f"👑 <b>لیست ادمین‌های فعلی:</b>\n{admins_str}"
+                ),
+                "reply_markup": {
+                    "inline_keyboard": [[{"text": "👑 پنل مدیریت", "callback_data": "menu:admin"}]]
+                },
+            }
+
+        # Handle add / promote admin
+        if not target_user:
+            target_user = User(
+                telegram_id=target_tg_id,
+                full_name=f"ادمین تلگرام {target_tg_id}",
+                hashed_password=get_password_hash(secrets.token_urlsafe(16)),
+                role=UserRole.ADMIN,
+                is_active=True,
+            )
+            db.add(target_user)
+            await db.commit()
+            await db.refresh(target_user)
+            await wallet_service.get_or_create_wallet(db, target_user.id)
+        else:
+            target_user.role = UserRole.ADMIN
+            await db.commit()
+            await db.refresh(target_user)
+
+        if target_tg_id and target_tg_id not in settings.ADMIN_TELEGRAM_IDS:
+            settings.ADMIN_TELEGRAM_IDS.append(target_tg_id)
+
+        admins_str = await _format_admins_list()
+        return {
+            "text": (
+                f"🎉 <b>ادمین جدید با موفقیت اضافه شد!</b>\n\n"
+                f"👤 <b>کاربر:</b> {html.escape(target_user.full_name or target_tg_id)}\n"
+                f"🆔 <b>آیدی تلگرام:</b> <code>{html.escape(target_tg_id)}</code>\n"
+                f"🔑 <b>سطح دسترسی:</b> مدیر کامل در ربات و مینی‌اپ\n"
+                "─────────────────\n"
+                f"👑 <b>لیست ادمین‌های فعلی:</b>\n{admins_str}"
+            ),
+            "reply_markup": {
+                "inline_keyboard": [[{"text": "👑 بازگشت به پنل مدیریت", "callback_data": "menu:admin"}]]
             },
         }
 
@@ -1083,6 +1247,20 @@ class TelegramBotService:
                     view = await cls.handle_admin_rate_command(db, text)
                 else:
                     view = {"text": "⛔ دسترسی غیرمجاز."}
+            elif text.startswith(("/addadmin", "/add_admin", "/admins", "/deladmin", "/removeadmin")):
+                is_admin = user.role == UserRole.ADMIN or tg_id in getattr(settings, "ADMIN_TELEGRAM_IDS", [])
+                if is_admin:
+                    view = await cls.handle_admin_manage_command(db, text)
+                else:
+                    view = {"text": "⛔ دسترسی غیرمجاز."}
+            elif text in ("/id", "/myid"):
+                view = {
+                    "text": (
+                        f"🆔 <b>آیدی عددی تلگرام شما:</b> <code>{html.escape(tg_id)}</code>\n"
+                        f"👤 <b>نام کاربری:</b> <code>@{html.escape(user.telegram_username or 'ندارد')}</code>"
+                    ),
+                    "reply_markup": {"inline_keyboard": [[{"text": "🏠 منوی اصلی", "callback_data": "menu:main"}]]},
+                }
             else:
                 view = await cls.build_welcome_view(db, user)
 
@@ -1162,6 +1340,12 @@ class TelegramBotService:
                 is_admin = user.role == UserRole.ADMIN or tg_id in getattr(settings, "ADMIN_TELEGRAM_IDS", [])
                 if is_admin:
                     view = await cls.handle_admin_rate_command(db, "/rate")
+                else:
+                    view = {"text": "⛔ دسترسی غیرمجاز."}
+            elif data == "adm:admins":
+                is_admin = user.role == UserRole.ADMIN or tg_id in getattr(settings, "ADMIN_TELEGRAM_IDS", [])
+                if is_admin:
+                    view = await cls.handle_admin_manage_command(db, "/admins")
                 else:
                     view = {"text": "⛔ دسترسی غیرمجاز."}
             elif data.startswith("adm_ff:"):
